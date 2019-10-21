@@ -2,6 +2,9 @@ import torch
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
+from .mnist_custom_utils import mnist
+from .cifar_custom_utils import cifar10
+
 
 # def data_augmentation(input_images, max_rot=25, horizontal_flip=True, width_shift_range=0.2, height_shift_range=0.2):
 #     def sometimes(aug): return iaa.Sometimes(0.5, aug)
@@ -66,6 +69,55 @@ def load_cifar_dataset(args, data_dir):
                                 shuffle=True)
 
     testset = datasets.CIFAR10(root=data_dir,
+                                train=False,
+                                download=True, transform=transforms.ToTensor())
+    loader_test = torch.utils.data.DataLoader(testset, 
+                                batch_size=args.test_batch_size,
+                                shuffle=False)
+    return loader_train, loader_test
+
+
+def load_dataset_custom(args, data_dir):
+    if args.dataset_in == 'CIFAR-10':
+        loader_train, loader_test = load_cifar_dataset_custom(args, data_dir)
+    elif args.dataset_in == 'MNIST':
+        loader_train, loader_test = load_mnist_dataset_custom(args, data_dir)
+    else:
+        raise ValueError('No support for dataset %s' % args.dataset)
+
+    return loader_train, loader_test
+
+def load_mnist_dataset_custom(args, data_dir):
+    # CIFAR-10 data loaders
+    trainset = mnist(root=data_dir, train=True,
+                                download=True, 
+                                transform=transforms.ToTensor())
+    loader_train = torch.utils.data.DataLoader(trainset, 
+                                batch_size=args.batch_size,
+                                shuffle=True)
+
+    testset = mnist(root=data_dir,train=False,
+                                download=True, 
+                                transform=transforms.ToTensor())
+    loader_test = torch.utils.data.DataLoader(testset, 
+                                batch_size=args.test_batch_size,
+                                shuffle=False)
+    return loader_train, loader_test
+
+def load_cifar_dataset_custom(args, data_dir):
+    # CIFAR-10 data loaders
+    trainset = cifar10(root=data_dir, train=True,
+                                download=True, 
+                                transform=transforms.Compose([
+                                    transforms.RandomHorizontalFlip(),
+                                    transforms.RandomCrop(32, 4),
+                                    transforms.ToTensor()
+                                ]))
+    loader_train = torch.utils.data.DataLoader(trainset, 
+                                batch_size=args.batch_size,
+                                shuffle=True)
+
+    testset = cifar10(root=data_dir,
                                 train=False,
                                 download=True, transform=transforms.ToTensor())
     loader_test = torch.utils.data.DataLoader(testset, 

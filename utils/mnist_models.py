@@ -4,12 +4,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class cnn_3l(nn.Module):
-    def __init__(self):
+    def __init__(self, n_classes=10):
         super(cnn_3l, self).__init__()
         self.conv1 = nn.Conv2d(1, 20, 5, 1)
         self.conv2 = nn.Conv2d(20, 50, 5, 1)
         self.fc1 = nn.Linear(4*4*50, 500)
-        self.fc2 = nn.Linear(500, 10)
+        self.fc2 = nn.Linear(500, n_classes)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
