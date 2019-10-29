@@ -57,7 +57,8 @@ def robust_test(model, loader, args, n_batches=0):
                            args.new_eps_step,
                            args.clip_min,
                            args.clip_max, 
-                           args.targeted)
+                           args.targeted,
+                           args.rand_init)
         elif 'PGD_l2' in args.attack:
             adv_x = pgd_l2_attack(model,
                x,
@@ -68,7 +69,8 @@ def robust_test(model, loader, args, n_batches=0):
                args.new_eps_step,
                args.clip_min,
                args.clip_max, 
-               args.targeted)
+               args.targeted,
+               args.rand_init)
         scores = model(x.cuda()) 
         _, preds = scores.data.max(1)
         scores_adv = model(adv_x)
@@ -122,7 +124,8 @@ def robust_test_during_train(model, loader, args, n_batches=0):
                            args.eps_step,
                            args.clip_min,
                            args.clip_max, 
-                           args.targeted)
+                           args.targeted,
+                           args.rand_init)
         elif 'PGD_l2' in args.attack:
             adv_x = pgd_l2_attack(model,
                x,
@@ -133,7 +136,8 @@ def robust_test_during_train(model, loader, args, n_batches=0):
                args.eps_step,
                args.clip_min,
                args.clip_max, 
-               args.targeted)
+               args.targeted,
+               args.rand_init)
         scores = model(x.cuda()) 
         _, preds = scores.data.max(1)
         scores_adv = model(adv_x)

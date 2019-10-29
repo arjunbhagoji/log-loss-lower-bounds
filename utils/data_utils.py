@@ -2,7 +2,7 @@ import torch
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
-from .mnist_custom_utils import mnist
+from .mnist_custom_utils import MNIST
 from .cifar_custom_utils import cifar10
 
 
@@ -40,7 +40,7 @@ def load_dataset(args, data_dir):
 def load_mnist_dataset(args, data_dir):
     # MNIST data loaders
     trainset = datasets.MNIST(root=data_dir, train=True,
-                                download=True, 
+                                download=False, 
                                 transform=transforms.ToTensor())
     loader_train = torch.utils.data.DataLoader(trainset, 
                                 batch_size=args.batch_size,
@@ -48,7 +48,7 @@ def load_mnist_dataset(args, data_dir):
 
     testset = datasets.MNIST(root=data_dir,
                                 train=False,
-                                download=True, transform=transforms.ToTensor())
+                                download=False, transform=transforms.ToTensor())
     loader_test = torch.utils.data.DataLoader(testset, 
                                 batch_size=args.test_batch_size,
                                 shuffle=False)
@@ -58,7 +58,7 @@ def load_mnist_dataset(args, data_dir):
 def load_cifar_dataset(args, data_dir):
     # CIFAR-10 data loaders
     trainset = datasets.CIFAR10(root=data_dir, train=True,
-                                download=True, 
+                                download=False, 
                                 transform=transforms.Compose([
                                     transforms.RandomHorizontalFlip(),
                                     transforms.RandomCrop(32, 4),
@@ -70,7 +70,7 @@ def load_cifar_dataset(args, data_dir):
 
     testset = datasets.CIFAR10(root=data_dir,
                                 train=False,
-                                download=True, transform=transforms.ToTensor())
+                                download=False, transform=transforms.ToTensor())
     loader_test = torch.utils.data.DataLoader(testset, 
                                 batch_size=args.test_batch_size,
                                 shuffle=False)
@@ -88,17 +88,19 @@ def load_dataset_custom(args, data_dir):
     return loader_train, loader_test
 
 def load_mnist_dataset_custom(args, data_dir):
-    # CIFAR-10 data loaders
-    trainset = mnist(root=data_dir, train=True,
-                                download=True, 
-                                transform=transforms.ToTensor())
+    # MNIST data loaders
+    trainset = MNIST(root=data_dir, args=args, train=True,
+                                download=False, 
+                                transform=transforms.ToTensor(),
+                                num_samples=args.num_samples)
     loader_train = torch.utils.data.DataLoader(trainset, 
                                 batch_size=args.batch_size,
                                 shuffle=True)
 
-    testset = mnist(root=data_dir,train=False,
-                                download=True, 
-                                transform=transforms.ToTensor())
+    testset = MNIST(root=data_dir, args=args, train=False,
+                                download=False, 
+                                transform=transforms.ToTensor(),
+                                num_samples=args.num_samples)
     loader_test = torch.utils.data.DataLoader(testset, 
                                 batch_size=args.test_batch_size,
                                 shuffle=False)
@@ -106,21 +108,50 @@ def load_mnist_dataset_custom(args, data_dir):
 
 def load_cifar_dataset_custom(args, data_dir):
     # CIFAR-10 data loaders
-    trainset = cifar10(root=data_dir, train=True,
-                                download=True, 
+    trainset = cifar10(root=data_dir, args=args, train=True,
+                                download=False, 
                                 transform=transforms.Compose([
                                     transforms.RandomHorizontalFlip(),
                                     transforms.RandomCrop(32, 4),
                                     transforms.ToTensor()
-                                ]))
+                                ]),
+                                num_samples=args.num_samples)
     loader_train = torch.utils.data.DataLoader(trainset, 
                                 batch_size=args.batch_size,
                                 shuffle=True)
 
-    testset = cifar10(root=data_dir,
+    testset = cifar10(root=data_dir, args=args,
                                 train=False,
-                                download=True, transform=transforms.ToTensor())
+                                download=False, transform=transforms.ToTensor(),
+                                num_samples=args.num_samples)
+
     loader_test = torch.utils.data.DataLoader(testset, 
                                 batch_size=args.test_batch_size,
                                 shuffle=False)
     return loader_train, loader_test
+
+def load_dataset_numpy(args, data_dir):
+    if args.dataset_in == 'MNIST':
+        trainset = MNIST(root=data_dir, args=args, train=True,
+                            download=False, 
+                            num_samples=args.num_samples,
+                            np_array=True)
+        testset = MNIST(root=data_dir, args=args, train=False,
+                                download=False, 
+                                num_samples=args.num_samples,
+                                np_array=True)
+    elif args.dataset_in == 'CIFAR-10':
+        trainset = cifar10(root=data_dir, args=args, train=True,
+                            download=False, 
+                            transform=transforms.Compose([
+                                transforms.RandomHorizontalFlip(),
+                                transforms.RandomCrop(32, 4),
+                            ]),
+                            num_samples=args.num_samples)
+        testset = cifar10(root=data_dir, args=args,
+                                train=False,
+                                download=False,
+                                num_samples=args.num_samples)
+    return trainset, testset
+
+        

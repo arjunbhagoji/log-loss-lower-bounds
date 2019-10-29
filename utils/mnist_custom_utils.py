@@ -9,9 +9,10 @@ import torch
 import codecs
 from torchvision.datasets.utils import download_url, download_and_extract_archive, extract_archive, \
     makedir_exist_ok, verify_str_arg
+from .io_utils import matching_file_name
 
 
-class mnist(VisionDataset):
+class MNIST(VisionDataset):
     """`MNIST <http://yann.lecun.com/exdb/mnist/>`_ Dataset.
 
     Args:
@@ -58,11 +59,12 @@ class mnist(VisionDataset):
         warnings.warn("test_data has been renamed data")
         return self.data
 
-    def __init__(self, root, train=True, transform=None, target_transform=None,
-                 download=False):
-        super(mnist, self).__init__(root, transform=transform,
+    def __init__(self, root, args, train=True, transform=None, target_transform=None,
+                 download=False, np_array=False):
+        super(MNIST, self).__init__(root, transform=transform,
                                     target_transform=target_transform)
         self.train = train  # training set or test set
+        self.np_array = np_array
 
         if download:
             self.download()
@@ -77,9 +79,12 @@ class mnist(VisionDataset):
             data_file = self.test_file
         self.data, self.targets = torch.load(os.path.join(self.processed_folder, data_file))
 
-        self.data, self.targets = self._two_c_filter()
+        self.data, self.targets = self._two_c_filter(args)
 
-    def _two_c_filter(self):
+        if args.dropping:
+            self.data, self.targets = self._matching_filter(args)
+
+    def _two_c_filter(self, args):
         class_1 = 3
         class_2 = 7
         targets_arr = np.array(self.targets)
@@ -88,6 +93,10 @@ class mnist(VisionDataset):
 
         X_c1 = self.data[c1_idx]
         X_c2 = self.data[c2_idx]
+
+        if num_samples is not None:
+            X_c1 = X_c1[:args.num_samples]
+            X_c2 = X_c2[:args.num_samples]
 
         curr_data = np.vstack((X_c1,X_c2))
         # curr_data = X_c1.extend(X_c2)
@@ -101,6 +110,24 @@ class mnist(VisionDataset):
         
         return curr_data, curr_labels
 
+    def _matching_filter(self, args):
+        output = np.load(matching_file_name(args))
+        num_matched = len(output[0])
+        if num_matched == 0:
+            print('No matching')
+            return self.data, self.targets
+        else:
+            mask_matched = np.ones(2*args.num_samples,dtype=bool)
+            for i in range(num_matched):
+                coin = np.random.random_sample()
+                if coin < 0.5:
+                    mask_matched[output[0][i]] = False
+                else:
+                    mask_matched[output[1][i]] = False
+            curr_data = self.data[mask_matched]
+            curr_labels = self.targets[mask_matched]
+            return curr_data, curr_labels
+
     def __getitem__(self, index):
         """
         Args:
@@ -113,7 +140,8 @@ class mnist(VisionDataset):
 
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
-        img = Image.fromarray(img, mode='L')
+        if not self.np_array:
+            img = Image.fromarray(img, mode='L')
 
         if self.transform is not None:
             img = self.transform(img)
@@ -139,6 +167,8 @@ class mnist(VisionDataset):
         return {_class: i for i, _class in enumerate(self.classes)}
 
     def _check_exists(self):
+        print(os.path.join(self.processed_folder,
+                                            self.training_file))
         return (os.path.exists(os.path.join(self.processed_folder,
                                             self.training_file)) and
                 os.path.exists(os.path.join(self.processed_folder,

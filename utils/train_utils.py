@@ -18,6 +18,7 @@ def update_hyparam(epoch, args):
 
 ########################################  Natural training ########################################
 def train_one_epoch(model, loss_fn, optimizer, loader_train, verbose=True):
+    losses = []
     model.train()
     for t, (x, y) in enumerate(loader_train):
         x = x.cuda()
@@ -26,16 +27,18 @@ def train_one_epoch(model, loss_fn, optimizer, loader_train, verbose=True):
         y_var = Variable(y, requires_grad= False)
         scores = model(x_var)
         loss = loss_fn(scores, y_var)
-
+        losses.append(loss.data.cpu().numpy())
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
     if verbose:
         print('loss = %.8f' % (loss.data))
+    return np.mean(losses)      
 
 
 ########################################  Adversarial training ########################################
 def robust_train_one_epoch(model, loss_fn, optimizer, loader_train, args, verbose=True):
+    losses = []
     model.train()
     for t, (x, y) in enumerate(loader_train):
         x = x.cuda()
@@ -57,7 +60,8 @@ def robust_train_one_epoch(model, loss_fn, optimizer, loader_train, args, verbos
                            args.eps_step,
                            args.clip_min,
                            args.clip_max, 
-                           args.targeted)
+                           args.targeted,
+                           args.rand_init)
         elif 'PGD_l2' in args.attack:
             adv_x = pgd_l2_attack(model,
                            x,
@@ -68,12 +72,15 @@ def robust_train_one_epoch(model, loss_fn, optimizer, loader_train, args, verbos
                            args.eps_step,
                            args.clip_min,
                            args.clip_max, 
-                           args.targeted)
+                           args.targeted,
+                           args.rand_init)
         
         scores = model(adv_x)
         loss = loss_fn(scores, y)
+        losses.append(loss.data.cpu().numpy())
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         if verbose:
             print('loss = %.8f' % (loss.data))
+    return np.mean(losses)

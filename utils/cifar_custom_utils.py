@@ -18,212 +18,6 @@ else:
 from torchvision.datasets.vision import VisionDataset
 from torchvision.datasets.utils import check_integrity, download_and_extract_archive
 
-# def calculate_md5(fpath, chunk_size=1024 * 1024):
-#     md5 = hashlib.md5()
-#     with open(fpath, 'rb') as f:
-#         for chunk in iter(lambda: f.read(chunk_size), b''):
-#             md5.update(chunk)
-#     return md5.hexdigest()
-
-
-# def check_md5(fpath, md5, **kwargs):
-#     return md5 == calculate_md5(fpath, **kwargs)
-
-
-# def check_integrity(fpath, md5=None):
-#     if not os.path.isfile(fpath):
-#         return False
-#     if md5 is None:
-#         return True
-#     return check_md5(fpath, md5)
-
-# class StandardTransform(object):
-#     def __init__(self, transform=None, target_transform=None):
-#         self.transform = transform
-#         self.target_transform = target_transform
-
-#     def __call__(self, input, target):
-#         if self.transform is not None:
-#             input = self.transform(input)
-#         if self.target_transform is not None:
-#             target = self.target_transform(target)
-#         return input, target
-
-#     def _format_transform_repr(self, transform, head):
-#         lines = transform.__repr__().splitlines()
-#         return (["{}{}".format(head, lines[0])] +
-#                 ["{}{}".format(" " * len(head), line) for line in lines[1:]])
-
-#     def __repr__(self):
-#         body = [self.__class__.__name__]
-#         if self.transform is not None:
-#             body += self._format_transform_repr(self.transform,
-#                                                 "Transform: ")
-#         if self.target_transform is not None:
-#             body += self._format_transform_repr(self.target_transform,
-#                                                 "Target transform: ")
-
-#         return '\n'.join(body)
-
-# class VisionDataset(data.Dataset):
-#     _repr_indent = 4
-
-#     def __init__(self, root, transforms=None, transform=None, target_transform=None):
-#         if isinstance(root, torch._six.string_classes):
-#             root = os.path.expanduser(root)
-#         self.root = root
-
-#         has_transforms = transforms is not None
-#         has_separate_transform = transform is not None or target_transform is not None
-#         if has_transforms and has_separate_transform:
-#             raise ValueError("Only transforms or transform/target_transform can "
-#                              "be passed as argument")
-
-#         # for backwards-compatibility
-#         self.transform = transform
-#         self.target_transform = target_transform
-
-#         if has_separate_transform:
-#             transforms = StandardTransform(transform, target_transform)
-#         self.transforms = transforms
-
-#     def __getitem__(self, index):
-#         raise NotImplementedError
-
-#     def __len__(self):
-#         raise NotImplementedError
-
-#     def __repr__(self):
-#         head = "Dataset " + self.__class__.__name__
-#         body = ["Number of datapoints: {}".format(self.__len__())]
-#         if self.root is not None:
-#             body.append("Root location: {}".format(self.root))
-#         body += self.extra_repr().splitlines()
-#         if hasattr(self, "transforms") and self.transforms is not None:
-#             body += [repr(self.transforms)]
-#         lines = [head] + [" " * self._repr_indent + line for line in body]
-#         return '\n'.join(lines)
-
-#     def _format_transform_repr(self, transform, head):
-#         lines = transform.__repr__().splitlines()
-#         return (["{}{}".format(head, lines[0])] +
-#                 ["{}{}".format(" " * len(head), line) for line in lines[1:]])
-
-#     def extra_repr(self):
-#         return ""
-
-
-# def get_mean_and_std(dataset):
-#     '''Compute the mean and std value of dataset.'''
-#     dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True, num_workers=2)
-#     mean = torch.zeros(3)
-#     std = torch.zeros(3)
-#     print('==> Computing mean and std..')
-#     for inputs, targets in dataloader:
-#         for i in range(3):
-#             mean[i] += inputs[:,i,:,:].mean()
-#             std[i] += inputs[:,i,:,:].std()
-#     mean.div_(len(dataset))
-#     std.div_(len(dataset))
-#     return mean, std
-
-# def init_params(net):
-#     '''Init layer parameters.'''
-#     for m in net.modules():
-#         if isinstance(m, nn.Conv2d):
-#             init.kaiming_normal(m.weight, mode='fan_out')
-#             if m.bias:
-#                 init.constant(m.bias, 0)
-#         elif isinstance(m, nn.BatchNorm2d):
-#             init.constant(m.weight, 1)
-#             init.constant(m.bias, 0)
-#         elif isinstance(m, nn.Linear):
-#             init.normal(m.weight, std=1e-3)
-#             if m.bias:
-#                 init.constant(m.bias, 0)
-
-
-# _, term_width = os.popen('stty size', 'r').read().split()
-# term_width = int(term_width)
-
-# TOTAL_BAR_LENGTH = 65.
-# last_time = time.time()
-# begin_time = last_time
-# def progress_bar(current, total, msg=None):
-#     global last_time, begin_time
-#     if current == 0:
-#         begin_time = time.time()  # Reset for new bar.
-
-#     cur_len = int(TOTAL_BAR_LENGTH*current/total)
-#     rest_len = int(TOTAL_BAR_LENGTH - cur_len) - 1
-
-#     sys.stdout.write(' [')
-#     for i in range(cur_len):
-#         sys.stdout.write('=')
-#     sys.stdout.write('>')
-#     for i in range(rest_len):
-#         sys.stdout.write('.')
-#     sys.stdout.write(']')
-
-#     cur_time = time.time()
-#     step_time = cur_time - last_time
-#     last_time = cur_time
-#     tot_time = cur_time - begin_time
-
-#     L = []
-#     L.append('  Step: %s' % format_time(step_time))
-#     L.append(' | Tot: %s' % format_time(tot_time))
-#     if msg:
-#         L.append(' | ' + msg)
-
-#     msg = ''.join(L)
-#     sys.stdout.write(msg)
-#     for i in range(term_width-int(TOTAL_BAR_LENGTH)-len(msg)-3):
-#         sys.stdout.write(' ')
-
-#     # Go back to the center of the bar.
-#     for i in range(term_width-int(TOTAL_BAR_LENGTH/2)+2):
-#         sys.stdout.write('\b')
-#     sys.stdout.write(' %d/%d ' % (current+1, total))
-
-#     if current < total-1:
-#         sys.stdout.write('\r')
-#     else:
-#         sys.stdout.write('\n')
-#     sys.stdout.flush()
-
-# def format_time(seconds):
-#     days = int(seconds / 3600/24)
-#     seconds = seconds - days*3600*24
-#     hours = int(seconds / 3600)
-#     seconds = seconds - hours*3600
-#     minutes = int(seconds / 60)
-#     seconds = seconds - minutes*60
-#     secondsf = int(seconds)
-#     seconds = seconds - secondsf
-#     millis = int(seconds*1000)
-
-#     f = ''
-#     i = 1
-#     if days > 0:
-#         f += str(days) + 'D'
-#         i += 1
-#     if hours > 0 and i <= 2:
-#         f += str(hours) + 'h'
-#         i += 1
-#     if minutes > 0 and i <= 2:
-#         f += str(minutes) + 'm'
-#         i += 1
-#     if secondsf > 0 and i <= 2:
-#         f += str(secondsf) + 's'
-#         i += 1
-#     if millis > 0 and i <= 2:
-#         f += str(millis) + 'ms'
-#         i += 1
-#     if f == '':
-#         f = '0ms'
-#     return f
-
 class cifar10(VisionDataset):
     """`CIFAR10 <https://www.cs.toronto.edu/~kriz/cifar.html>`_ Dataset.
 
@@ -263,7 +57,7 @@ class cifar10(VisionDataset):
     }
 
     def __init__(self, root, train=True, transform=None, target_transform=None,
-                 download=False):
+                 download=False, num_samples=None):
 
         super(cifar10, self).__init__(root, transform=transform,
                                       target_transform=target_transform)
@@ -302,11 +96,11 @@ class cifar10(VisionDataset):
         self.data = np.vstack(self.data).reshape(-1, 3, 32, 32)
         self.data = self.data.transpose((0, 2, 3, 1))  # convert to HWC
 
-        self.data, self.targets = self._two_c_filter()
+        self.data, self.targets = self._two_c_filter(num_samples)
 
         self._load_meta()
 
-    def _two_c_filter(self):
+    def _two_c_filter(self,num_samples):
         class_1 = 3
         class_2 = 7
         targets_arr = np.array(self.targets)
@@ -315,6 +109,10 @@ class cifar10(VisionDataset):
 
         X_c1 = self.data[c1_idx]
         X_c2 = self.data[c2_idx]
+
+        if num_samples is not None:
+            X_c1 = X_c1[:num_samples]
+            X_c2 = X_c2[:num_samples]
 
         curr_data = np.vstack((X_c1,X_c2))
 
