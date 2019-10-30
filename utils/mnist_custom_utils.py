@@ -60,7 +60,7 @@ class MNIST(VisionDataset):
         return self.data
 
     def __init__(self, root, args, train=True, transform=None, target_transform=None,
-                 download=False, np_array=False):
+                 download=False, np_array=False, dropping=False):
         super(MNIST, self).__init__(root, transform=transform,
                                     target_transform=target_transform)
         self.train = train  # training set or test set
@@ -81,8 +81,9 @@ class MNIST(VisionDataset):
 
         self.data, self.targets = self._two_c_filter(args)
 
-        if args.dropping:
+        if train and dropping:
             self.data, self.targets = self._matching_filter(args)
+            print(len(self.data))
 
     def _two_c_filter(self, args):
         class_1 = 3
@@ -94,7 +95,7 @@ class MNIST(VisionDataset):
         X_c1 = self.data[c1_idx]
         X_c2 = self.data[c2_idx]
 
-        if num_samples is not None:
+        if args.num_samples is not None:
             X_c1 = X_c1[:args.num_samples]
             X_c2 = X_c2[:args.num_samples]
 
@@ -111,8 +112,14 @@ class MNIST(VisionDataset):
         return curr_data, curr_labels
 
     def _matching_filter(self, args):
-        output = np.load(matching_file_name(args))
+        class_1 = 3
+        class_2 = 7
+        if os.path.exists(matching_file_name(args,class_1,class_2)):
+            output = np.load(matching_file_name(args, class_1, class_2))
+        else:
+            raise ValueError('No matching computed')
         num_matched = len(output[0])
+        print(num_matched)
         if num_matched == 0:
             print('No matching')
             return self.data, self.targets
@@ -123,9 +130,11 @@ class MNIST(VisionDataset):
                 if coin < 0.5:
                     mask_matched[output[0][i]] = False
                 else:
-                    mask_matched[output[1][i]] = False
+                    mask_matched[args.num_samples+output[1][i]] = False
+            print(len(np.where(mask_matched==False)[0]))
             curr_data = self.data[mask_matched]
-            curr_labels = self.targets[mask_matched]
+            curr_labels = np.array(self.targets)
+            curr_labels = curr_labels[mask_matched]
             return curr_data, curr_labels
 
     def __getitem__(self, index):
@@ -167,8 +176,6 @@ class MNIST(VisionDataset):
         return {_class: i for i, _class in enumerate(self.classes)}
 
     def _check_exists(self):
-        print(os.path.join(self.processed_folder,
-                                            self.training_file))
         return (os.path.exists(os.path.join(self.processed_folder,
                                             self.training_file)) and
                 os.path.exists(os.path.join(self.processed_folder,
