@@ -3,13 +3,10 @@ import argparse
 import time
 import os
 
-# from datasets import data_mnist, data_census
 from utils.data_utils import load_dataset_numpy
-# from keras.datasets import cifar10
 
 import scipy.spatial.distance
 from scipy.optimize import linear_sum_assignment
-# from hungarian import linear_sum_assignment
 
 import matplotlib as mpl
 mpl.use('Agg')
@@ -92,12 +89,6 @@ for (x,y) in train_data:
 X_train = np.array(X_train)
 Y_train = np.array(Y_train)
 
-# X_train = train_data[:]
-# Y_train = train_data[1]
-
-print(len(X_train))
-print(len(Y_train))
-
 if 'MNIST' in args.dataset_in or 'CIFAR-10' in args.dataset_in:
 	class_1 = 3
 	class_2 = 7
@@ -107,13 +98,11 @@ if 'MNIST' in args.dataset_in or 'CIFAR-10' in args.dataset_in:
 	if os.path.exists(dist_mat_name):
 		D_12 = np.load(dist_mat_name)
 	else:
-		print(X_c1.shape)
 		if args.norm == 'l2':
 			D_12 = scipy.spatial.distance.cdist(X_c1,X_c2,metric='euclidean')
 		elif args.norm == 'linf':
 			D_12 = scipy.spatial.distance.cdist(X_c1,X_c2,metric='chebyshev')
 		np.save(dist_mat_name,D_12)
-	# print(D_12)
 
 if args.norm == 'l2' and 'MNIST' in args.dataset_in:
 	eps_list = np.linspace(2.0,5.0,4)
@@ -128,6 +117,7 @@ elif args.norm == 'linf' and 'CIFAR-10' in args.dataset:
 print(eps_list)
 
 save_file_name = str(class_1) + '_' + str(class_2) + '_' + str(args.num_samples) + '_' + args.dataset_in + '_' + args.norm
+save_file_name_c0 = str(class_1) + '_' + str(class_2) + '_' + str(args.num_samples) + '_' + args.dataset_in + '_' + args.norm + '_cost_zero'
 
 if not os.path.exists('cost_results'):
 	os.makedirs('cost_results')
@@ -141,29 +131,27 @@ if not os.path.exists('figures'):
 f = open('cost_results/' + save_file_name + '.txt', 'a')
 f.write('eps,cost,inf_loss'+'\n')
 
-# marked_curr = np.zeros((no_of_examples, no_of_examples), dtype=int)
 for eps in eps_list:
 	cost_matrix = D_12 > 2*eps
 	cost_matrix = cost_matrix.astype(float)
-	# print(cost_matrix)
 
 	curr_file_name = 'matchings/' + save_file_name + '_{0:.1f}.npy'.format(eps)
+	curr_file_name_c0 = 'matchings/' + save_file_name_c0 + '_{0:.1f}.npy'.format(eps)
 
 	if os.path.exists(curr_file_name):
+		print('Loading computed matching')
 		output = np.load(curr_file_name)
-		# output = np.expand_dims(output,axis=0)
+		output_c0 = np.load(curr_file_name_c0)
+		costs = cost_matrix[output[0], output[1]]
 	else:
 		time1 = time.time()
-		# if eps>eps_list[0]:
-		# 	output = linear_sum_assignment(cost_matrix, marked_curr, False)
-		# else:
-		# 	output = linear_sum_assignment(cost_matrix, None, True)
+		
 		output = linear_sum_assignment(cost_matrix)
-		print(output)
+		costs = cost_matrix[output[0], output[1]]
+		cost_zero_indices = np.where(costs==0.0)
 
-		np.save(curr_file_name, output)
-
-		# marked_curr = output[1]
+		matching_indices = (output[0][cost_zero_indices], output[1][cost_zero_indices])
+		np.save(curr_file_name_c0, matching_indices)
 
 		time2 = time.time()
 
@@ -171,7 +159,6 @@ for eps in eps_list:
 
 	raw_cost = np.float(cost_matrix[output[0], output[1]].sum())
 
-	costs = cost_matrix[output[0], output[1]]
 	save_adv_images(costs, output[0], output[1], X_c1, X_c2, eps)
 
 	mean_cost = raw_cost/(args.num_samples)
