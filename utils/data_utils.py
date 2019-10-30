@@ -92,7 +92,7 @@ def load_mnist_dataset_custom(args, data_dir):
     trainset = MNIST(root=data_dir, args=args, train=True,
                                 download=False, 
                                 transform=transforms.ToTensor(),
-                                num_samples=args.num_samples)
+                                dropping=args.dropping)
     loader_train = torch.utils.data.DataLoader(trainset, 
                                 batch_size=args.batch_size,
                                 shuffle=True)
@@ -100,7 +100,7 @@ def load_mnist_dataset_custom(args, data_dir):
     testset = MNIST(root=data_dir, args=args, train=False,
                                 download=False, 
                                 transform=transforms.ToTensor(),
-                                num_samples=args.num_samples)
+                                dropping=args.dropping)
     loader_test = torch.utils.data.DataLoader(testset, 
                                 batch_size=args.test_batch_size,
                                 shuffle=False)
@@ -115,15 +115,16 @@ def load_cifar_dataset_custom(args, data_dir):
                                     transforms.RandomCrop(32, 4),
                                     transforms.ToTensor()
                                 ]),
-                                num_samples=args.num_samples)
+                                dropping=args.dropping)
     loader_train = torch.utils.data.DataLoader(trainset, 
                                 batch_size=args.batch_size,
                                 shuffle=True)
 
     testset = cifar10(root=data_dir, args=args,
                                 train=False,
-                                download=False, transform=transforms.ToTensor(),
-                                num_samples=args.num_samples)
+                                download=False, 
+                                transform=transforms.ToTensor(),
+                                dropping=args.dropping)
 
     loader_test = torch.utils.data.DataLoader(testset, 
                                 batch_size=args.test_batch_size,
@@ -133,12 +134,10 @@ def load_cifar_dataset_custom(args, data_dir):
 def load_dataset_numpy(args, data_dir):
     if args.dataset_in == 'MNIST':
         trainset = MNIST(root=data_dir, args=args, train=True,
-                            download=False, 
-                            num_samples=args.num_samples,
+                            download=False,
                             np_array=True)
         testset = MNIST(root=data_dir, args=args, train=False,
-                                download=False, 
-                                num_samples=args.num_samples,
+                                download=False,
                                 np_array=True)
     elif args.dataset_in == 'CIFAR-10':
         trainset = cifar10(root=data_dir, args=args, train=True,
@@ -146,12 +145,10 @@ def load_dataset_numpy(args, data_dir):
                             transform=transforms.Compose([
                                 transforms.RandomHorizontalFlip(),
                                 transforms.RandomCrop(32, 4),
-                            ]),
-                            num_samples=args.num_samples)
+                            ]))
         testset = cifar10(root=data_dir, args=args,
                                 train=False,
-                                download=False,
-                                num_samples=args.num_samples)
+                                download=False)
     return trainset, testset
 
         
