@@ -1,6 +1,6 @@
 import os 
-# os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-# os.environ['CUDA_VISIBLE_DEVICES'] = '4'
+os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+os.environ['CUDA_VISIBLE_DEVICES'] = '4'
 
 import torch
 import torch.nn as nn
@@ -43,6 +43,7 @@ if __name__ == '__main__':
     parser.add_argument('--epsilon', type=float, default=8.0)
     parser.add_argument('--attack_iter', type=int, default=10)
     parser.add_argument('--eps_step', type=float, default=2.0)
+    parser.add_argument('--is_dropping', dest='dropping', action='store_true')
 
     # Attack args
     parser.add_argument('--new_attack', type=str, default='PGD_l2')
@@ -67,6 +68,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
     model_dir_name, log_dir_name = init_dirs(args)
     print('Loading %s' % model_dir_name)
+
+    # Setting to False to load all training data
+    args.dropping = False
     
     if args.n_classes != 10:
         loader_train, loader_test = load_dataset_custom(args, data_dir='data')
@@ -88,7 +92,7 @@ if __name__ == '__main__':
 
     if torch.cuda.device_count() > 1:
         print("Using multiple GPUs")
-    net = nn.DataParallel(net)
+        net = nn.DataParallel(net)
 
     args.batch_size = args.batch_size * torch.cuda.device_count()
     print("Using batch size of {}".format(args.batch_size))
