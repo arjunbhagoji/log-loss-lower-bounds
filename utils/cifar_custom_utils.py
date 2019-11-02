@@ -56,8 +56,8 @@ class cifar10(VisionDataset):
         'md5': '5ff9c542aee3614f3951f8cda6e48888',
     }
 
-    def __init__(self, root, train=True, transform=None, target_transform=None,
-                 download=False, num_samples=None):
+    def __init__(self, root, args, train=True, transform=None, target_transform=None,
+                 download=False, num_samples=None, dropping=False):
 
         super(cifar10, self).__init__(root, transform=transform,
                                       target_transform=target_transform)
