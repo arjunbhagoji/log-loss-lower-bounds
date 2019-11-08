@@ -60,7 +60,7 @@ class MNIST(VisionDataset):
         return self.data
 
     def __init__(self, root, args, train=True, transform=None, target_transform=None,
-                 download=False, np_array=False, dropping=False):
+                 download=False, np_array=False, dropping=False, training=True):
         super(MNIST, self).__init__(root, transform=transform,
                                     target_transform=target_transform)
         self.train = train  # training set or test set
@@ -81,7 +81,8 @@ class MNIST(VisionDataset):
 
         self.data, self.targets = self._two_c_filter(args)
 
-        if train and dropping:
+        if training and dropping:
+            print(len(self.data))
             self.data, self.targets = self._matching_filter(args)
             print(len(self.data))
 
