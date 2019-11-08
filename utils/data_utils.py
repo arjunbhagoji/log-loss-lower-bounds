@@ -28,13 +28,13 @@ from .cifar_custom_utils import cifar10
 
 def load_dataset(args, data_dir):
     if args.dataset_in == 'CIFAR-10':
-        loader_train, loader_test = load_cifar_dataset(args, data_dir)
+        loader_train, loader_test, data_details = load_cifar_dataset(args, data_dir)
     elif args.dataset_in == 'MNIST':
-        loader_train, loader_test = load_mnist_dataset(args, data_dir)
+        loader_train, loader_test, data_details = load_mnist_dataset(args, data_dir)
     else:
         raise ValueError('No support for dataset %s' % args.dataset)
 
-    return loader_train, loader_test
+    return loader_train, loader_test, data_details
 
 
 def load_mnist_dataset(args, data_dir):
@@ -52,7 +52,8 @@ def load_mnist_dataset(args, data_dir):
     loader_test = torch.utils.data.DataLoader(testset, 
                                 batch_size=args.test_batch_size,
                                 shuffle=False)
-    return loader_train, loader_test
+    data_details = {'n_channels':1, 'h_in':28, 'w_in':28, 'scale':255.0}
+    return loader_train, loader_test, data_details
 
 
 def load_cifar_dataset(args, data_dir):
@@ -74,25 +75,27 @@ def load_cifar_dataset(args, data_dir):
     loader_test = torch.utils.data.DataLoader(testset, 
                                 batch_size=args.test_batch_size,
                                 shuffle=False)
-    return loader_train, loader_test
+    data_details = {'n_channels':3, 'h_in':32, 'w_in':32, 'scale':255.0}
+    return loader_train, loader_test, data_details
 
 
 def load_dataset_custom(args, data_dir):
     if args.dataset_in == 'CIFAR-10':
-        loader_train, loader_test = load_cifar_dataset_custom(args, data_dir)
+        loader_train, loader_test, data_details = load_cifar_dataset_custom(args, data_dir)
     elif args.dataset_in == 'MNIST':
-        loader_train, loader_test = load_mnist_dataset_custom(args, data_dir)
+        loader_train, loader_test, data_details = load_mnist_dataset_custom(args, data_dir)
     else:
         raise ValueError('No support for dataset %s' % args.dataset)
 
-    return loader_train, loader_test
+    return loader_train, loader_test, data_details
 
-def load_mnist_dataset_custom(args, data_dir):
+def load_mnist_dataset_custom(args, data_dir, training=True):
     # MNIST data loaders
     trainset = MNIST(root=data_dir, args=args, train=True,
                                 download=False, 
                                 transform=transforms.ToTensor(),
-                                dropping=args.dropping)
+                                dropping=args.dropping,
+                                training=training)
     loader_train = torch.utils.data.DataLoader(trainset, 
                                 batch_size=args.batch_size,
                                 shuffle=True)
@@ -100,11 +103,13 @@ def load_mnist_dataset_custom(args, data_dir):
     testset = MNIST(root=data_dir, args=args, train=False,
                                 download=False, 
                                 transform=transforms.ToTensor(),
-                                dropping=args.dropping)
+                                dropping=args.dropping,
+                                training=False)
     loader_test = torch.utils.data.DataLoader(testset, 
                                 batch_size=args.test_batch_size,
                                 shuffle=False)
-    return loader_train, loader_test
+    data_details = {'n_channels':1, 'h_in':28, 'w_in':28, 'scale':255.0}
+    return loader_train, loader_test, data_details
 
 def load_cifar_dataset_custom(args, data_dir):
     # CIFAR-10 data loaders
@@ -129,7 +134,8 @@ def load_cifar_dataset_custom(args, data_dir):
     loader_test = torch.utils.data.DataLoader(testset, 
                                 batch_size=args.test_batch_size,
                                 shuffle=False)
-    return loader_train, loader_test
+    data_details = {'n_channels':3, 'h_in':32, 'w_in':32, 'scale':255.0}
+    return loader_train, loader_test, data_details
 
 def load_dataset_numpy(args, data_dir):
     if args.dataset_in == 'MNIST':
@@ -150,5 +156,3 @@ def load_dataset_numpy(args, data_dir):
                                 train=False,
                                 download=False)
     return trainset, testset
-
-        

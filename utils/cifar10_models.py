@@ -50,7 +50,7 @@ class WideResNet(nn.Module):
     """
     Ref: https://github.com/xternalz/WideResNet-pytorch
     """
-    def __init__(self, depth, num_classes, widen_factor=1, dropRate=0.0, input_std=True):
+    def __init__(self, depth, num_classes, widen_factor=1, dropRate=0.0, input_std=True, input_channels=3):
         super(WideResNet, self).__init__()
         nChannels = [16, 16*widen_factor, 32*widen_factor, 64*widen_factor]
         assert((depth - 4) % 6 == 0)
@@ -59,7 +59,7 @@ class WideResNet(nn.Module):
         # Normalization: 
         self.input_std = input_std
         # 1st conv before any network block
-        self.conv1 = nn.Conv2d(3, nChannels[0], kernel_size=3, stride=1,
+        self.conv1 = nn.Conv2d(input_channels, nChannels[0], kernel_size=3, stride=1,
                                padding=1, bias=False)
         # 1st block
         self.block1 = NetworkBlock(n, nChannels[0], nChannels[1], block, 1, dropRate)

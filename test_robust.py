@@ -44,21 +44,22 @@ if __name__ == '__main__':
     parser.add_argument('--attack_iter', type=int, default=10)
     parser.add_argument('--eps_step', type=float, default=2.0)
     parser.add_argument('--is_dropping', dest='dropping', action='store_true')
+    parser.add_argument('--rand_init', dest='rand_init', action='store_true')
 
     # Attack args
     parser.add_argument('--new_attack', type=str, default='PGD_l2')
-    parser.add_argument('--new_epsilon', type=float, default=75.0)
-    parser.add_argument('--new_attack_iter', type=int, default=10)
-    parser.add_argument('--new_eps_step', type=float, default=8.0)
+    parser.add_argument('--new_epsilon', type=float, default=2.0)
+    parser.add_argument('--new_attack_iter', type=int, default=20)
+    parser.add_argument('--new_eps_step', type=float, default=0.25)
     parser.add_argument('--targeted', dest='targeted', action='store_true')
     parser.add_argument('--clip_min', type=float, default=0)
     parser.add_argument('--clip_max', type=float, default=1.0)
-    parser.add_argument('--rand_init', dest='rand_init', action='store_true')
+    parser.add_argument('--new_rand_init', dest='new_rand_init', action='store_true')
 
     # IO args
     parser.add_argument('--last_epoch', type=int, default=0)
     parser.add_argument('--checkpoint_path', type=str, default='trained_models')
-    
+    parser.add_argument('--is_viz', dest='viz', action='store_true')
 
     if torch.cuda.is_available():
         print('CUDA enabled')
@@ -66,7 +67,7 @@ if __name__ == '__main__':
         raise ValueError('Needs a working GPU!')
 
     args = parser.parse_args()
-    model_dir_name, log_dir_name = init_dirs(args)
+    model_dir_name, log_dir_name, figure_dir_name = init_dirs(args)
     print('Loading %s' % model_dir_name)
 
     # Setting to False to load all training data
@@ -87,8 +88,8 @@ if __name__ == '__main__':
             net = WideResNet(depth=args.depth, num_classes=args.n_classes, widen_factor=args.width)
     
     if 'linf' in args.attack:
-        args.epsilon /= 255
-        args.eps_step /= 255
+        args.epsilon /= 255.
+        args.eps_step /= 255.
 
     if torch.cuda.device_count() > 1:
         print("Using multiple GPUs")
@@ -101,9 +102,12 @@ if __name__ == '__main__':
 
     criterion = nn.CrossEntropyLoss()  
 
+    training = False
     net.eval()
     ckpt_path = 'checkpoint_' + str(args.last_epoch)
     print(model_dir_name)
     net.load_state_dict(torch.load(model_dir_name + ckpt_path))
-    test(net, loader_train)
-    robust_test(net, loader_train, args, n_batches=10)
+    # test(net, loader_train, figure_dir_name)
+    # robust_test(net, loader_train, args, figure_dir_name, n_batches=10)
+    test(net, loader_test, figure_dir_name)
+    robust_test(net, loader_test, args, figure_dir_name, n_batches=10)

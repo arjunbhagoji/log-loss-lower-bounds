@@ -74,6 +74,7 @@ parser.add_argument("--norm", default='l2',
                     help="norm to be used")
 parser.add_argument('--num_samples', type=int, default=None)
 parser.add_argument('--n_classes', type=int, default=10)
+parser.add_argument('--eps', type=float, default=None)
 
 args = parser.parse_args()
 
@@ -105,7 +106,7 @@ if 'MNIST' in args.dataset_in or 'CIFAR-10' in args.dataset_in:
 		np.save(dist_mat_name,D_12)
 
 if args.norm == 'l2' and 'MNIST' in args.dataset_in:
-	eps_list = np.linspace(2.0,5.0,4)
+	eps_list = np.linspace(3.2,3.8,4)
 	# eps_list=[2.6,2.8]
 elif args.norm == 'l2' and 'CIFAR-10' in args.dataset:
 	eps_list = np.linspace(4.0,10.0,13)
@@ -113,6 +114,9 @@ elif args.norm == 'linf' and 'MNIST' in args.dataset:
 	eps_list = np.linspace(0.1,0.5,5)
 elif args.norm == 'linf' and 'CIFAR-10' in args.dataset:
 	eps_list = np.linspace(0.1,0.5,5)
+
+if args.eps is not None:
+	eps_list = [args.eps]
 
 print(eps_list)
 
@@ -149,7 +153,8 @@ for eps in eps_list:
 		output = linear_sum_assignment(cost_matrix)
 		costs = cost_matrix[output[0], output[1]]
 		cost_zero_indices = np.where(costs==0.0)
-
+		np.save(curr_file_name, output)
+		
 		matching_indices = (output[0][cost_zero_indices], output[1][cost_zero_indices])
 		np.save(curr_file_name_c0, matching_indices)
 
