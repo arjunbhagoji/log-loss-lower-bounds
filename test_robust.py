@@ -1,6 +1,6 @@
 import os 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-os.environ['CUDA_VISIBLE_DEVICES'] = '4'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import torch
 import torch.nn as nn
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     # Model args
     parser.add_argument('--model', type=str, default='cnn_3l', choices=['wrn','cnn_3l', 'cnn_3l_large'])
     parser.add_argument('--depth', type=int, default=28)
-    parser.add_argument('--width', type=int, default=1)
+    parser.add_argument('--width', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=128) 
     parser.add_argument('--test_batch_size', type=int, default=128)
     # parser.add_argument('--learning_rate', type=float, default=0.1)
@@ -92,7 +92,7 @@ if __name__ == '__main__':
 
     if torch.cuda.device_count() > 1:
         print("Using multiple GPUs")
-        net = nn.DataParallel(net)
+    net = nn.DataParallel(net)
 
     args.batch_size = args.batch_size * torch.cuda.device_count()
     print("Using batch size of {}".format(args.batch_size))
