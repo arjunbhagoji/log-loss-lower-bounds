@@ -2,7 +2,7 @@ import torch
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
-from .mnist_custom_utils import MNIST
+from .mnist_custom_utils import MNIST, FashionMNIST
 from .cifar_custom_utils import cifar10
 
 
@@ -29,7 +29,7 @@ from .cifar_custom_utils import cifar10
 def load_dataset(args, data_dir):
     if args.dataset_in == 'CIFAR-10':
         loader_train, loader_test, data_details = load_cifar_dataset(args, data_dir)
-    elif args.dataset_in == 'MNIST':
+    elif 'MNIST' in args.dataset_in:
         loader_train, loader_test, data_details = load_mnist_dataset(args, data_dir)
     else:
         raise ValueError('No support for dataset %s' % args.dataset)
@@ -39,16 +39,25 @@ def load_dataset(args, data_dir):
 
 def load_mnist_dataset(args, data_dir):
     # MNIST data loaders
-    trainset = datasets.MNIST(root=data_dir, train=True,
-                                download=False, 
-                                transform=transforms.ToTensor())
+    if args.dataset_in == 'MNIST':
+        trainset = datasets.MNIST(root=data_dir, train=True,
+                                    download=False, 
+                                    transform=transforms.ToTensor())
+        testset = datasets.MNIST(root=data_dir,
+                                train=False,
+                                download=False, transform=transforms.ToTensor())
+    elif args.dataset_in == 'fMNIST':
+        trainset = datasets.FashionMNIST(root=data_dir, train=True,
+                            download=False, 
+                            transform=transforms.ToTensor())
+        testset = datasets.FashionMNIST(root=data_dir,
+                        train=False,
+                        download=False, transform=transforms.ToTensor())
+    
     loader_train = torch.utils.data.DataLoader(trainset, 
                                 batch_size=args.batch_size,
                                 shuffle=True)
 
-    testset = datasets.MNIST(root=data_dir,
-                                train=False,
-                                download=False, transform=transforms.ToTensor())
     loader_test = torch.utils.data.DataLoader(testset, 
                                 batch_size=args.test_batch_size,
                                 shuffle=False)
@@ -82,7 +91,7 @@ def load_cifar_dataset(args, data_dir):
 def load_dataset_custom(args, data_dir):
     if args.dataset_in == 'CIFAR-10':
         loader_train, loader_test, data_details = load_cifar_dataset_custom(args, data_dir)
-    elif args.dataset_in == 'MNIST':
+    elif 'MNIST' in args.dataset_in:
         loader_train, loader_test, data_details = load_mnist_dataset_custom(args, data_dir)
     else:
         raise ValueError('No support for dataset %s' % args.dataset)
@@ -91,20 +100,33 @@ def load_dataset_custom(args, data_dir):
 
 def load_mnist_dataset_custom(args, data_dir, training=True):
     # MNIST data loaders
-    trainset = MNIST(root=data_dir, args=args, train=True,
-                                download=False, 
-                                transform=transforms.ToTensor(),
-                                dropping=args.dropping,
-                                training=training)
+    if args.dataset_in == 'MNIST':
+        trainset = MNIST(root=data_dir, args=args, train=True,
+                                    download=False, 
+                                    transform=transforms.ToTensor(),
+                                    dropping=args.dropping,
+                                    training=training)
+        testset = MNIST(root=data_dir, args=args, train=False,
+                            download=False, 
+                            transform=transforms.ToTensor(),
+                            dropping=args.dropping,
+                            training=False)
+    elif args.dataset_in == 'fMNIST':
+        trainset = FashionMNIST(root=data_dir, args=args, train=True,
+                                    download=False, 
+                                    transform=transforms.ToTensor(),
+                                    dropping=args.dropping,
+                                    training=training)
+        testset = FashionMNIST(root=data_dir, args=args, train=False,
+                            download=False, 
+                            transform=transforms.ToTensor(),
+                            dropping=args.dropping,
+                            training=False)
+
     loader_train = torch.utils.data.DataLoader(trainset, 
                                 batch_size=args.batch_size,
                                 shuffle=True)
 
-    testset = MNIST(root=data_dir, args=args, train=False,
-                                download=False, 
-                                transform=transforms.ToTensor(),
-                                dropping=args.dropping,
-                                training=False)
     loader_test = torch.utils.data.DataLoader(testset, 
                                 batch_size=args.test_batch_size,
                                 shuffle=False)
@@ -143,6 +165,13 @@ def load_dataset_numpy(args, data_dir):
                             download=False,
                             np_array=True)
         testset = MNIST(root=data_dir, args=args, train=False,
+                                download=False,
+                                np_array=True)
+    elif args.dataset_in == 'fMNIST':
+        trainset = FashionMNIST(root=data_dir, args=args, train=True,
+                            download=False,
+                            np_array=True)
+        testset = FashionMNIST(root=data_dir, args=args, train=False,
                                 download=False,
                                 np_array=True)
     elif args.dataset_in == 'CIFAR-10':

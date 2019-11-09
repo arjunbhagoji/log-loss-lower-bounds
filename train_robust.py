@@ -82,12 +82,12 @@ if __name__ == '__main__':
         loader_train, loader_test, data_details = load_dataset(args, data_dir='data')
 
 
-    if args.dataset_in == 'MNIST':
+    if 'MNIST' in args.dataset_in:
         if 'cnn_3l' in args.model:
-            if 'large' in args.model:
-                net = cnn_3l_large(args.n_classes)
-            else:
-                net = cnn_3l(args.n_classes, args.conv_expand, args.fc_expand)
+            # if 'large' in args.model:
+            #     net = cnn_3l_large(args.n_classes)
+            # else:
+            net = cnn_3l(args.n_classes, args.conv_expand, args.fc_expand)
         elif 'wrn' in args.model:
             net = WideResNet(depth=args.depth, num_classes=args.n_classes, widen_factor=args.width, input_channels=data_details['n_channels'])
     elif args.dataset_in == 'CIFAR-10':
@@ -107,7 +107,7 @@ if __name__ == '__main__':
 
     net.cuda()
 
-    if args.dataset_in == 'MNIST':
+    if 'MNIST' in args.dataset_in:
         summary(net, (1,28,28))
     
     if args.load_checkpoint:

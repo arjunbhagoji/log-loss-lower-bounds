@@ -11,6 +11,7 @@ from torch.autograd import Variable
 import numpy as np
 import time
 import argparse
+from torchsummary import summary
 
 from utils.mnist_models import cnn_3l, cnn_3l_large
 from utils.cifar10_models import WideResNet
@@ -30,6 +31,8 @@ if __name__ == '__main__':
     
     # Model args
     parser.add_argument('--model', type=str, default='cnn_3l', choices=['wrn','cnn_3l', 'cnn_3l_large'])
+    parser.add_argument('--conv_expand', type=int, default=1)
+    parser.add_argument('--fc_expand', type=int, default=1)
     parser.add_argument('--depth', type=int, default=28)
     parser.add_argument('--width', type=int, default=1)
     parser.add_argument('--batch_size', type=int, default=128) 
@@ -74,15 +77,15 @@ if __name__ == '__main__':
     args.dropping = False
     
     if args.n_classes != 10:
-        loader_train, loader_test = load_dataset_custom(args, data_dir='data')
+        loader_train, loader_test, data_details = load_dataset_custom(args, data_dir='data')
     else:
-        loader_train, loader_test = load_dataset(args, data_dir='data')
+        loader_train, loader_test, data_details = load_dataset(args, data_dir='data')
 
     if args.dataset_in == 'MNIST':
         if 'large' in args.model:
             net = cnn_3l_large(args.n_classes)
         else:
-            net = cnn_3l(args.n_classes)
+            net = cnn_3l(args.n_classes, args.conv_expand, args.fc_expand)
     elif args.dataset_in == 'CIFAR-10':
         if 'wrn' in args.model:
             net = WideResNet(depth=args.depth, num_classes=args.n_classes, widen_factor=args.width)
@@ -100,6 +103,9 @@ if __name__ == '__main__':
 
     net.cuda()
 
+   # if args.dataset_in == 'MNIST':
+       # summary(net, (1,28,28))
+
     criterion = nn.CrossEntropyLoss()  
 
     training = False
@@ -107,7 +113,7 @@ if __name__ == '__main__':
     ckpt_path = 'checkpoint_' + str(args.last_epoch)
     print(model_dir_name)
     net.load_state_dict(torch.load(model_dir_name + ckpt_path))
-    # test(net, loader_train, figure_dir_name)
-    # robust_test(net, loader_train, args, figure_dir_name, n_batches=10)
-    test(net, loader_test, figure_dir_name)
-    robust_test(net, loader_test, args, figure_dir_name, n_batches=10)
+    test(net, loader_train, figure_dir_name)
+    robust_test(net, loader_train, args, figure_dir_name, n_batches=10)
+    # test(net, loader_test, figure_dir_name)
+    # robust_test(net, loader_test, args, figure_dir_name, n_batches=10)
