@@ -1,6 +1,6 @@
 import os 
-# os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-# os.environ['CUDA_VISIBLE_DEVICES'] = '3,4'
+os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1,6'
 
 import torch
 import torch.nn as nn
@@ -95,8 +95,8 @@ if __name__ == '__main__':
             net = WideResNet(depth=args.depth, num_classes=args.n_classes, widen_factor=args.width, input_channels=data_details['n_channels'])
 
     if 'linf' in args.attack:
-        args.epsilon /= 255
-        args.eps_step /= 255
+        args.epsilon /= 255.
+        args.eps_step /= 255.
     
     if torch.cuda.device_count() > 1:
         print("Using multiple GPUs")

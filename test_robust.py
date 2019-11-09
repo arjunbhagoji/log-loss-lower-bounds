@@ -1,6 +1,6 @@
 import os 
-# os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-# os.environ['CUDA_VISIBLE_DEVICES'] = '4'
+os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import torch
 import torch.nn as nn
@@ -34,7 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('--conv_expand', type=int, default=1)
     parser.add_argument('--fc_expand', type=int, default=1)
     parser.add_argument('--depth', type=int, default=28)
-    parser.add_argument('--width', type=int, default=1)
+    parser.add_argument('--width', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=128) 
     parser.add_argument('--test_batch_size', type=int, default=128)
     # parser.add_argument('--learning_rate', type=float, default=0.1)
