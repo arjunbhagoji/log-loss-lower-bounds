@@ -7,7 +7,10 @@ from .attack_utils import cal_loss, generate_target_label_tensor, pgd_attack, pg
 
 def update_hyparam(epoch, args):
     #args.learning_rate = args.learning_rate * (0.6 ** ((max((epoch-args.schedule_length), 0) // 5)))
-    lr_steps = [100, 150, 200]
+    if args.lr_schedule == 0:
+      lr_steps = [100, 150, 200]
+    elif args.lr_schedule == 1:
+      lr_steps = [50, 100, 150, 200]
     lr = args.learning_rate
     for i in lr_steps:
         if epoch<i:

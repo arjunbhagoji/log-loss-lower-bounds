@@ -7,6 +7,8 @@ def init_dirs(args):
 	if 'cnn_3l' in args.model:
 		if args.conv_expand != 1 or args.fc_expand != 1:
 			model_name += '-conv' + str(args.conv_expand) + '-fc' + str(args.fc_expand) 
+	if args.lr_schedule != 0:
+		model_name += '_lr-sch' + str(args.lr_schedule)
 	if args.is_adv:
 		model_name += '_robust' + '_eps' + str(args.epsilon) + '_k' + str(args.attack_iter) + '_delta' + str(args.eps_step)
 	# if args.is_adv:

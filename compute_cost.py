@@ -2,7 +2,7 @@ import numpy as np
 import argparse
 import time
 import os
-import bisect
+import collections
 
 from utils.data_utils import load_dataset_numpy
 
@@ -21,7 +21,7 @@ def save_adv_images(cm, indices_1, indices_2, X_c1, X_c2, eps):
 	X_2 = X_c2[indices_1[adv_indices]]
 	adv_images = (X_1 + X_2)/2.0
 	no_to_print = len(adv_images)
-	print(no_to_print)
+	# print(no_to_print)
 	if 'MNIST' in args.dataset_in:
 		adv_images = adv_images.reshape((no_to_print,28,28))
 	elif 'CIFAR-10' in args.dataset_in:
@@ -108,7 +108,7 @@ if 'MNIST' in args.dataset_in or 'CIFAR-10' in args.dataset_in:
 
 if args.norm == 'l2' and 'MNIST' in args.dataset_in:
 	# eps_list = np.linspace(3.2,3.8,4)
-	eps_list = np.linspace(0.0,5.0,26)
+	eps_list = np.linspace(4.0,5.0,2)
 	# eps_list=[2.6,2.8]
 elif args.norm == 'l2' and 'CIFAR-10' in args.dataset:
 	eps_list = np.linspace(4.0,10.0,13)
@@ -137,8 +137,8 @@ if not os.path.exists('figures'):
 if not os.path.exists('degree_results'):
 	os.makedirs('degree_results')
 
-# f = open('cost_results/' + save_file_name + '.txt', 'a')
-# f.write('eps,cost,inf_loss'+'\n')
+f = open('cost_results/' + save_file_name + '.txt', 'a')
+f.write('eps,cost,inf_loss'+'\n')
 
 f2 = open('degree_results/' + save_file_name + '.txt', 'a')
 f2.write('eps,adn,loss_lb_loose'+'\n')
@@ -148,53 +148,79 @@ for eps in eps_list:
 	cost_matrix = D_12 > 2*eps
 	cost_matrix = cost_matrix.astype(float)
 
+	# Vertex degree analysis
+	degrees = {}
 	deg_list = []
 	for i in range(2*args.num_samples):
-		i = i % args.num_samples
+		sample_index = i % args.num_samples
 		if i<args.num_samples:
-			deg_list.append(np.sum(cost_matrix[i,:]))
+			curr_degree = np.sum(cost_matrix[sample_index,:])
+			deg_list.append(curr_degree)
+			degrees[str(i)] = curr_degree
 		elif i>args.num_samples:
-			deg_list.append(np.sum(cost_matrix[:,i]))
+			curr_degree = np.sum(cost_matrix[:,sample_index])
+			deg_list.append(curr_degree)
+			degrees[str(i)] = curr_degree
 	# print(len(deg_list))
+	sorted_degrees = sorted(degrees.items(), key=lambda kv: kv[1])
+	sorted_degrees_dict = collections.OrderedDict(sorted_degrees)
+	# print(sorted_degrees_dict)
+
 	avg_degree_norm = np.mean(deg_list)/args.num_samples
 	print(avg_degree_norm)
 	loss_lb_loose = (1-avg_degree_norm)/2.0
 	f2.write('{:2.2},{:.4e},{:.4e}\n'.format(eps,avg_degree_norm,loss_lb_loose))
 
-# 	curr_file_name = 'matchings/' + save_file_name + '_{0:.1f}.npy'.format(eps)
-# 	curr_file_name_c0 = 'matchings/' + save_file_name_c0 + '_{0:.1f}.npy'.format(eps)
+	curr_file_name = 'matchings/' + save_file_name + '_{0:.1f}.npy'.format(eps)
+	curr_file_name_c0 = 'matchings/' + save_file_name_c0 + '_{0:.1f}.npy'.format(eps)
 
-# 	if os.path.exists(curr_file_name):
-# 		print('Loading computed matching')
-# 		output = np.load(curr_file_name)
-# 		output_c0 = np.load(curr_file_name_c0)
-# 		costs = cost_matrix[output[0], output[1]]
-# 	else:
-# 		time1 = time.time()
+	if os.path.exists(curr_file_name):
+		print('Loading computed matching')
+		output = np.load(curr_file_name)
+		matching_indices = np.load(curr_file_name_c0)
+		costs = cost_matrix[output[0], output[1]]
+	else:
+		time1 = time.time()
 		
-# 		output = linear_sum_assignment(cost_matrix)
-# 		costs = cost_matrix[output[0], output[1]]
-# 		cost_zero_indices = np.where(costs==0.0)
-# 		np.save(curr_file_name, output)
+		output = linear_sum_assignment(cost_matrix)
+		costs = cost_matrix[output[0], output[1]]
+		cost_zero_indices = np.where(costs==0.0)
+		np.save(curr_file_name, output)
 		
-# 		matching_indices = (output[0][cost_zero_indices], output[1][cost_zero_indices])
-# 		np.save(curr_file_name_c0, matching_indices)
+		matching_indices = (output[0][cost_zero_indices], output[1][cost_zero_indices])
+		np.save(curr_file_name_c0, matching_indices)
 
-# 		time2 = time.time()
+		time2 = time.time()
 
-# 		print('Time taken for %s examples per class for eps %s is %s' % (args.num_samples, eps, time2-time1))
+		print('Time taken for %s examples per class for eps %s is %s' % (args.num_samples, eps, time2-time1))
 
-# 	raw_cost = np.float(cost_matrix[output[0], output[1]].sum())
+	raw_cost = np.float(cost_matrix[output[0], output[1]].sum())
 
-# 	save_adv_images(costs, output[0], output[1], X_c1, X_c2, eps)
+	# save_adv_images(costs, output[0], output[1], X_c1, X_c2, eps)
 
-# 	mean_cost = raw_cost/(args.num_samples)
+	mean_cost = raw_cost/(args.num_samples)
 
-# 	min_error = (1-mean_cost)/2
+	min_error = (1-mean_cost)/2
 
-# 	print('At eps %s, cost: %s ; inf error: %s' % (eps, mean_cost, min_error)) 
+	print('At eps %s, cost: %s ; inf error: %s' % (eps, mean_cost, min_error)) 
 
-# 	f.write(str(eps)+','+str(mean_cost)+','+str(min_error) + '\n')
+	f.write(str(eps)+','+str(mean_cost)+','+str(min_error) + '\n')
 
-# f.close()
+	# Intersection analysis
+	matching_indices[1] += args.num_samples
+	no_matched = 2*len(matching_indices[0])
+	print(no_matched)
+	matching_indices = matching_indices.reshape(no_matched)
+	# print(matching_indices)
+	lowest_degree_indices = []
+	count = 0
+	for k,v in sorted_degrees_dict.items():
+		if count < no_matched:
+			lowest_degree_indices.append(int(k))
+		count += 1
+	# print(lowest_degree_indices)
+	intersection = np.intersect1d(matching_indices,lowest_degree_indices)
+	print(len(intersection))
+
+f.close()
 f2.close()
