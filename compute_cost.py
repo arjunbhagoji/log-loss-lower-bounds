@@ -3,6 +3,7 @@ import argparse
 import time
 import os
 import collections
+import json
 
 from utils.data_utils import load_dataset_numpy
 
@@ -74,8 +75,9 @@ parser.add_argument("--dataset_in", default='MNIST',
 parser.add_argument("--norm", default='l2',
                     help="norm to be used")
 parser.add_argument('--num_samples', type=int, default=None)
-parser.add_argument('--n_classes', type=int, default=10)
+parser.add_argument('--n_classes', type=int, default=2)
 parser.add_argument('--eps', type=float, default=None)
+parser.add_argument('--approx_only', dest='approx_only', action='store_true')
 
 args = parser.parse_args()
 
@@ -101,13 +103,13 @@ if 'MNIST' in args.dataset_in or 'CIFAR-10' in args.dataset_in:
 	X_c1 = X_train[:args.num_samples].reshape(args.num_samples, DATA_DIM)
 	X_c2 = X_train[args.num_samples:].reshape(args.num_samples, DATA_DIM)
 	if os.path.exists(dist_mat_name):
-		D_12 = np.load(dist_mat_name)
+		D_12 = np.load('distances/' + dist_mat_name)
 	else:
 		if args.norm == 'l2':
 			D_12 = scipy.spatial.distance.cdist(X_c1,X_c2,metric='euclidean')
 		elif args.norm == 'linf':
 			D_12 = scipy.spatial.distance.cdist(X_c1,X_c2,metric='chebyshev')
-		np.save(dist_mat_name,D_12)
+		np.save('distances/' + dist_mat_name, D_12)
 
 if args.norm == 'l2' and 'MNIST' in args.dataset_in:
 	# eps_list = np.linspace(3.2,3.8,4)
@@ -151,77 +153,82 @@ for eps in eps_list:
 	cost_matrix = D_12 > 2*eps
 	cost_matrix = cost_matrix.astype(float)
 
+	f3_name = 'degree_results/' + save_file_name + '_{0:.1f}.json'.format(eps)
 	# Vertex degree analysis
-	degrees = {}
-	deg_list = []
-	for i in range(2*args.num_samples):
-		sample_index = i % args.num_samples
-		if i<args.num_samples:
-			curr_degree = np.sum(cost_matrix[sample_index,:])
-			deg_list.append(curr_degree)
-			degrees[str(i)] = curr_degree
-		elif i>args.num_samples:
-			curr_degree = np.sum(cost_matrix[:,sample_index])
-			deg_list.append(curr_degree)
-			degrees[str(i)] = curr_degree
-	# print(len(deg_list))
-	sorted_degrees = sorted(degrees.items(), key=lambda kv: kv[1])
-	sorted_degrees_dict = collections.OrderedDict(sorted_degrees)
-	# print(sorted_degrees_dict)
-	avg_degree_norm = np.mean(deg_list)/args.num_samples
-	loss_lb_loose = (1-avg_degree_norm)/2.0
-	f2.write('{:2.2},{:.4e},{:.4e}\n'.format(eps,avg_degree_norm,loss_lb_loose))
+	if not os.path.exists(f3_name):
+		f3 = open(f3_name, 'w')
+		degrees = {}
+		deg_list = []
+		for i in range(2*args.num_samples):
+			sample_index = i % args.num_samples
+			if i<args.num_samples:
+				curr_degree = np.sum(cost_matrix[sample_index,:])
+				deg_list.append(curr_degree)
+				degrees[str(i)] = curr_degree
+			elif i>args.num_samples:
+				curr_degree = np.sum(cost_matrix[:,sample_index])
+				deg_list.append(curr_degree)
+				degrees[str(i)] = curr_degree
+		# print(len(deg_list))
+		sorted_degrees = sorted(degrees.items(), key=lambda kv: kv[1])
+		sorted_degrees_dict = collections.OrderedDict(sorted_degrees)
+		print(sorted_degrees_dict)
+		json.dump(sorted_degrees_dict, f3)
+		avg_degree_norm = np.mean(deg_list)/args.num_samples
+		loss_lb_loose = (1-avg_degree_norm)/2.0
+		f2.write('{:2.2},{:.4e},{:.4e}\n'.format(eps,avg_degree_norm,loss_lb_loose))
 
-	curr_file_name = 'matchings/' + save_file_name + '_{0:.1f}.npy'.format(eps)
-	curr_file_name_c0 = 'matchings/' + save_file_name_c0 + '_{0:.1f}.npy'.format(eps)
+	if not args.approx_only:
+		curr_file_name = 'matchings/' + save_file_name + '_{0:.1f}.npy'.format(eps)
+		curr_file_name_c0 = 'matchings/' + save_file_name_c0 + '_{0:.1f}.npy'.format(eps)
+		if os.path.exists(curr_file_name):
+			print('Loading computed matching')
+			output = np.load(curr_file_name)
+			matching_indices = np.load(curr_file_name_c0)
+			costs = cost_matrix[output[0], output[1]]
+		else:
+			time1 = time.time()
+			
+			output = linear_sum_assignment(cost_matrix)
+			costs = cost_matrix[output[0], output[1]]
+			cost_zero_indices = np.where(costs==0.0)
+			np.save(curr_file_name, output)
+			
+			matching_indices = (output[0][cost_zero_indices], output[1][cost_zero_indices])
+			np.save(curr_file_name_c0, matching_indices)
 
-	if os.path.exists(curr_file_name):
-		print('Loading computed matching')
-		output = np.load(curr_file_name)
-		matching_indices = np.load(curr_file_name_c0)
-		costs = cost_matrix[output[0], output[1]]
-	else:
-		time1 = time.time()
-		
-		output = linear_sum_assignment(cost_matrix)
-		costs = cost_matrix[output[0], output[1]]
-		cost_zero_indices = np.where(costs==0.0)
-		np.save(curr_file_name, output)
-		
-		matching_indices = (output[0][cost_zero_indices], output[1][cost_zero_indices])
-		np.save(curr_file_name_c0, matching_indices)
+			time2 = time.time()
 
-		time2 = time.time()
+			print('Time taken for %s examples per class for eps %s is %s' % (args.num_samples, eps, time2-time1))
 
-		print('Time taken for %s examples per class for eps %s is %s' % (args.num_samples, eps, time2-time1))
+		raw_cost = np.float(cost_matrix[output[0], output[1]].sum())
 
-	raw_cost = np.float(cost_matrix[output[0], output[1]].sum())
+		# save_adv_images(costs, output[0], output[1], X_c1, X_c2, eps)
 
-	# save_adv_images(costs, output[0], output[1], X_c1, X_c2, eps)
+		mean_cost = raw_cost/(args.num_samples)
 
-	mean_cost = raw_cost/(args.num_samples)
+		min_error = (1-mean_cost)/2
 
-	min_error = (1-mean_cost)/2
+		print('At eps %s, cost: %s ; inf error: %s' % (eps, mean_cost, min_error)) 
 
-	print('At eps %s, cost: %s ; inf error: %s' % (eps, mean_cost, min_error)) 
+		f.write(str(eps)+','+str(mean_cost)+','+str(min_error) + '\n')
 
-	f.write(str(eps)+','+str(mean_cost)+','+str(min_error) + '\n')
-
-	# Intersection analysis
-	matching_indices[1] += args.num_samples
-	no_matched = 2*len(matching_indices[0])
-	print(no_matched)
-	matching_indices = matching_indices.reshape(no_matched)
-	# print(matching_indices)
-	lowest_degree_indices = []
-	count = 0
-	for k,v in sorted_degrees_dict.items():
-		if count < no_matched:
-			lowest_degree_indices.append(int(k))
-		count += 1
-	# print(lowest_degree_indices)
-	intersection = np.intersect1d(matching_indices,lowest_degree_indices)
-	print(len(intersection))
+		# Intersection analysis
+		matching_indices[1] += args.num_samples
+		no_matched = 2*len(matching_indices[0])
+		print(no_matched)
+		matching_indices = matching_indices.reshape(no_matched)
+		# print(matching_indices)
+		lowest_degree_indices = []
+		count = 0
+		for k,v in sorted_degrees_dict.items():
+			if count < no_matched:
+				lowest_degree_indices.append(int(k))
+			count += 1
+		# print(lowest_degree_indices)
+		intersection = np.intersect1d(matching_indices,lowest_degree_indices)
+		print(len(intersection))
 
 f.close()
 f2.close()
+f3.close()

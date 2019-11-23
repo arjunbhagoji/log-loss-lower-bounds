@@ -1,6 +1,6 @@
 import os 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-os.environ['CUDA_VISIBLE_DEVICES'] = '5'
+os.environ['CUDA_VISIBLE_DEVICES'] = '4,5'
 
 import torch
 import torch.nn as nn
@@ -17,7 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 from utils.mnist_models import cnn_3l
 from utils.cifar10_models import WideResNet
 from utils.densenet_model import DenseNet
-from utils.train_utils import train_one_epoch, robust_train_one_epoch, update_hyparam, eps_scheduler
+from utils.train_utils import train_one_epoch, robust_train_one_epoch, update_hyparam
 from utils.test_utils import test, robust_test_during_train
 from utils.data_utils import load_dataset, load_dataset_custom
 from utils.io_utils import init_dirs
@@ -66,8 +66,11 @@ if __name__ == '__main__':
 
     # Matching args
     parser.add_argument('--is_dropping', dest='dropping', action='store_true')
+    parser.add_argument('--dropping_strat', type=str, default='matched')
     parser.add_argument('--matching_path', type=str, default='matchings')
+    parser.add_argument('--degree_path', type=str, default='degree_results')
     parser.add_argument("--norm", default='l2', help="norm to be used")
+    parser.add_argument('--drop_thresh', type=int, default=100)
     
     args = parser.parse_args()
     model_dir_name, log_dir_name, _ = init_dirs(args)

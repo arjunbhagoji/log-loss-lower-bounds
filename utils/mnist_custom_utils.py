@@ -7,9 +7,10 @@ import os.path
 import numpy as np
 import torch
 import codecs
+import json
 from torchvision.datasets.utils import download_url, download_and_extract_archive, extract_archive, \
     makedir_exist_ok, verify_str_arg
-from .io_utils import matching_file_name
+from .io_utils import matching_file_name, degree_file_name
 
 
 class MNIST(VisionDataset):
@@ -83,7 +84,11 @@ class MNIST(VisionDataset):
 
         if training and dropping:
             print(len(self.data))
-            self.data, self.targets = self._matching_filter(args)
+            if args.dropping_strat == 'matched':
+                self.data, self.targets = self._matching_filter(args)
+            elif args.dropping_strat == 'approx':
+                print('Using approx filtering')
+                self.data, self.targets = self._degree_filter(args)
             print(len(self.data))
 
     def _two_c_filter(self, args):
@@ -133,6 +138,39 @@ class MNIST(VisionDataset):
                 else:
                     mask_matched[args.num_samples+output[1][i]] = False
             print(len(np.where(mask_matched==False)[0]))
+            curr_data = self.data[mask_matched]
+            curr_labels = np.array(self.targets)
+            curr_labels = curr_labels[mask_matched]
+            return curr_data, curr_labels
+
+    def _degree_filter(self, args):
+        class_1 = 3
+        class_2 = 7
+        if os.path.exists(degree_file_name(args,class_1,class_2)):
+            with open(degree_file_name(args,class_1,class_2)) as json_file:
+                degree_data = json.load(json_file)
+                print(degree_data)
+        else:
+            raise ValueError('No degree details computed')
+        first_key = next(iter(degree_data))
+        if degree_data[first_key] == args.num_samples:
+            print('Only cost 1 edges present')
+            return self.data, self.targets
+        else:
+            mask_matched = np.ones(2*args.num_samples,dtype=bool)
+            count = 0
+            first_time = 2*args.num_samples
+            for k,v in degree_data.items():
+                if v == args.num_samples and first_time>count:
+                    first_time = count
+                if count >= args.drop_thresh:
+                    break
+                else:
+                    print(k)
+                    mask_matched[int(k)] = False
+                count += 1
+            print(len(np.where(mask_matched==False)[0]))
+            print(first_time)
             curr_data = self.data[mask_matched]
             curr_labels = np.array(self.targets)
             curr_labels = curr_labels[mask_matched]
