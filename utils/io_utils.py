@@ -11,6 +11,8 @@ def init_dirs(args):
 		model_name += '_lr-sch' + str(args.lr_schedule)
 	if args.is_adv:
 		model_name += '_robust' + '_eps' + str(args.epsilon) + '_k' + str(args.attack_iter) + '_delta' + str(args.eps_step)
+	if args.eps_schedule != 0:
+		model_name += '_eps_sched' + str(args.eps_schedule)
 	# if args.is_adv:
 	# 	model_name += '_robust' + '_eps' + str(args.epsilon)
 	if args.rand_init:

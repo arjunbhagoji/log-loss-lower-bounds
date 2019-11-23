@@ -111,6 +111,7 @@ def robust_test_during_train(model, loss_fn, loader, args, n_batches=0):
     num_correct, num_correct_adv, num_samples = 0, 0, 0
     steps = 1
     losses = []
+    losses_adv = []
     for x, y in loader:
         x = x.cuda()
         y = y.cuda()
@@ -147,10 +148,12 @@ def robust_test_during_train(model, loss_fn, loader, args, n_batches=0):
                args.rand_init)
         scores = model(x.cuda()) 
         _, preds = scores.data.max(1)
+        loss = loss_fn(scores, y)
+        losses.append(loss.data.cpu().numpy())
         scores_adv = model(adv_x)
         _, preds_adv = scores_adv.data.max(1)
-        loss = loss_fn(scores_adv, y)
-        losses.append(loss.data.cpu().numpy())
+        loss_adv = loss_fn(scores_adv, y)
+        losses_adv.append(loss_adv.data.cpu().numpy())
         num_correct += (preds == y).sum()
         num_correct_adv += (preds_adv == y).sum()
         num_samples += len(preds)
@@ -171,4 +174,4 @@ def robust_test_during_train(model, loss_fn, loader, args, n_batches=0):
         num_samples,
     ))
 
-    return acc, acc_adv, np.mean(losses)
+    return 100.*acc, 100.*acc_adv, np.mean(losses), np.mean(losses_adv)

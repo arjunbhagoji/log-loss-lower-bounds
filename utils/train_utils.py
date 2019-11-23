@@ -5,6 +5,21 @@ import time
 
 from .attack_utils import cal_loss, generate_target_label_tensor, pgd_attack, pgd_l2_attack
 
+def eps_scheduler(epoch, args):
+    eps_scale = (args.eps_step*args.attack_iter)/args.epsilon
+    if args.eps_schedule == 1:
+        print(epoch, args.train_epochs/2)
+        if epoch <= args.train_epochs/2:
+          eps = args.epsilon/2
+          delta = eps*eps_scale/args.attack_iter
+        elif epoch > args.train_epochs/2:
+          eps = args.epsilon
+          delta = args.eps_step
+    elif args.eps_schedule == 0:
+        eps = args.epsilon
+        delta = args.eps_step
+    return eps, delta
+
 def update_hyparam(epoch, args):
     #args.learning_rate = args.learning_rate * (0.6 ** ((max((epoch-args.schedule_length), 0) // 5)))
     if args.lr_schedule == 0:
@@ -40,8 +55,10 @@ def train_one_epoch(model, loss_fn, optimizer, loader_train, verbose=True):
 
 
 ########################################  Adversarial training ########################################
-def robust_train_one_epoch(model, loss_fn, optimizer, loader_train, args, verbose=True):
+def robust_train_one_epoch(model, loss_fn, optimizer, loader_train, args, eps, delta, verbose=True):
+    print('Current eps: {}, delta: {}'.format(eps, delta))
     losses = []
+    losses_ben = []
     model.train()
     for t, (x, y) in enumerate(loader_train):
         x = x.cuda()
@@ -59,8 +76,8 @@ def robust_train_one_epoch(model, loss_fn, optimizer, loader_train, args, verbos
                            x_var,
                            y_target,
                            args.attack_iter,
-                           args.epsilon,
-                           args.eps_step,
+                           eps,
+                           delta,
                            args.clip_min,
                            args.clip_max, 
                            args.targeted,
@@ -71,8 +88,8 @@ def robust_train_one_epoch(model, loss_fn, optimizer, loader_train, args, verbos
                            x_var,
                            y_target,
                            args.attack_iter,
-                           args.epsilon,
-                           args.eps_step,
+                           eps,
+                           delta,
                            args.clip_min,
                            args.clip_max, 
                            args.targeted,
@@ -84,6 +101,8 @@ def robust_train_one_epoch(model, loss_fn, optimizer, loader_train, args, verbos
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        loss_ben = loss_fn(model(x),y)
+        losses_ben.append(loss_ben.data.cpu().numpy())
         if verbose:
             print('loss = %.8f' % (loss.data))
-    return np.mean(losses)
+    return np.mean(losses), np.mean(losses_ben)
