@@ -91,6 +91,9 @@ for (x,y) in train_data:
 X_train = np.array(X_train)
 Y_train = np.array(Y_train)
 
+if not os.path.exists('distances'):
+	os.makedirs('distances')
+
 if 'MNIST' in args.dataset_in or 'CIFAR-10' in args.dataset_in:
 	class_1 = 3
 	class_2 = 7
@@ -165,9 +168,7 @@ for eps in eps_list:
 	sorted_degrees = sorted(degrees.items(), key=lambda kv: kv[1])
 	sorted_degrees_dict = collections.OrderedDict(sorted_degrees)
 	# print(sorted_degrees_dict)
-
 	avg_degree_norm = np.mean(deg_list)/args.num_samples
-	print(avg_degree_norm)
 	loss_lb_loose = (1-avg_degree_norm)/2.0
 	f2.write('{:2.2},{:.4e},{:.4e}\n'.format(eps,avg_degree_norm,loss_lb_loose))
 

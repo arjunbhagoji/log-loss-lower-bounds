@@ -1,6 +1,6 @@
 import os 
-os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+# os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import torch
 import torch.nn as nn
@@ -11,9 +11,11 @@ from torch.autograd import Variable
 import numpy as np
 import time
 import argparse
+from torchsummary import summary
 
 from utils.mnist_models import cnn_3l, cnn_3l_large
 from utils.cifar10_models import WideResNet
+from utils.densenet_model import DenseNet
 from utils.test_utils import test, robust_test
 from utils.data_utils import load_dataset, load_dataset_custom
 from utils.io_utils import init_dirs
@@ -29,7 +31,9 @@ if __name__ == '__main__':
     parser.add_argument('--num_samples', type=int, default=None)
     
     # Model args
-    parser.add_argument('--model', type=str, default='cnn_3l', choices=['wrn','cnn_3l', 'cnn_3l_large'])
+    parser.add_argument('--model', type=str, default='cnn_3l', choices=['wrn','cnn_3l', 'dn'])
+    parser.add_argument('--conv_expand', type=int, default=1)
+    parser.add_argument('--fc_expand', type=int, default=1)
     parser.add_argument('--depth', type=int, default=28)
     parser.add_argument('--width', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=128) 
@@ -45,6 +49,7 @@ if __name__ == '__main__':
     parser.add_argument('--eps_step', type=float, default=2.0)
     parser.add_argument('--is_dropping', dest='dropping', action='store_true')
     parser.add_argument('--rand_init', dest='rand_init', action='store_true')
+    parser.add_argument('--eps_schedule', type=int, default=0)
 
     # Attack args
     parser.add_argument('--new_attack', type=str, default='PGD_l2')
@@ -74,18 +79,31 @@ if __name__ == '__main__':
     args.dropping = False
     
     if args.n_classes != 10:
-        loader_train, loader_test = load_dataset_custom(args, data_dir='data')
+        loader_train, loader_test, data_details = load_dataset_custom(args, data_dir='data')
     else:
-        loader_train, loader_test = load_dataset(args, data_dir='data')
+        loader_train, loader_test, data_details = load_dataset(args, data_dir='data')
 
-    if args.dataset_in == 'MNIST':
-        if 'large' in args.model:
-            net = cnn_3l_large(args.n_classes)
-        else:
-            net = cnn_3l(args.n_classes)
+    num_channels = data_details['n_channels']
+
+    if 'MNIST' in args.dataset_in:
+        if 'cnn_3l' in args.model:
+            # if 'large' in args.model:
+            #     net = cnn_3l_large(args.n_classes)
+            # else:
+            net = cnn_3l(args.n_classes, args.conv_expand, args.fc_expand)
+        elif 'wrn' in args.model:
+            net = WideResNet(depth=args.depth, num_classes=args.n_classes, 
+                widen_factor=args.width, input_channels=num_channels)
+        elif 'dn' in args.model:
+            net = DenseNet(growthRate=12, depth=35, reduction=1.0,
+                            bottleneck=False, nClasses=args.n_classes, ChannelsIn=num_channels)
     elif args.dataset_in == 'CIFAR-10':
         if 'wrn' in args.model:
-            net = WideResNet(depth=args.depth, num_classes=args.n_classes, widen_factor=args.width)
+            net = WideResNet(depth=args.depth, num_classes=args.n_classes, 
+                widen_factor=args.width, input_channels=num_channels)
+        elif 'dn' in args.model:
+            net = DenseNet(growthRate=12, depth=100, reduction=0.5,
+                            bottleneck=True, nClasses=args.n_classes, ChannelsIn=num_channels)
     
     if 'linf' in args.attack:
         args.epsilon /= 255.
@@ -100,6 +118,9 @@ if __name__ == '__main__':
 
     net.cuda()
 
+   # if args.dataset_in == 'MNIST':
+       # summary(net, (1,28,28))
+
     criterion = nn.CrossEntropyLoss()  
 
     training = False
@@ -107,7 +128,7 @@ if __name__ == '__main__':
     ckpt_path = 'checkpoint_' + str(args.last_epoch)
     print(model_dir_name)
     net.load_state_dict(torch.load(model_dir_name + ckpt_path))
-    # test(net, loader_train, figure_dir_name)
-    # robust_test(net, loader_train, args, figure_dir_name, n_batches=10)
-    test(net, loader_test, figure_dir_name)
-    robust_test(net, loader_test, args, figure_dir_name, n_batches=10)
+    test(net, loader_train, figure_dir_name)
+    robust_test(net, loader_train, args, figure_dir_name, n_batches=10)
+    # test(net, loader_test, figure_dir_name)
+    # robust_test(net, loader_test, args, figure_dir_name, n_batches=10)

@@ -16,7 +16,8 @@ from torch.utils.tensorboard import SummaryWriter
 
 from utils.mnist_models import cnn_3l
 from utils.cifar10_models import WideResNet
-from utils.train_utils import train_one_epoch, robust_train_one_epoch, update_hyparam
+from utils.densenet_model import DenseNet
+from utils.train_utils import train_one_epoch, robust_train_one_epoch, update_hyparam, eps_scheduler
 from utils.test_utils import test, robust_test_during_train
 from utils.data_utils import load_dataset, load_dataset_custom
 from utils.io_utils import init_dirs
@@ -31,7 +32,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_samples', type=int, default=None)
 
     # Model args
-    parser.add_argument('--model', type=str, default='cnn_3l', choices=['wrn','cnn_3l', 'cnn_3l_large', 'cnn_3l_all_16x', 'cnn_3l_conv_16x', 'cnn_3l_conv_32x'])
+    parser.add_argument('--model', type=str, default='cnn_3l', choices=['wrn','cnn_3l', 'dn'])
     parser.add_argument('--conv_expand', type=int, default=1)
     parser.add_argument('--fc_expand', type=int, default=1)
     parser.add_argument('--depth', type=int, default=28)
@@ -55,6 +56,7 @@ if __name__ == '__main__':
     parser.add_argument('--clip_min', type=float, default=0)
     parser.add_argument('--clip_max', type=float, default=1.0)
     parser.add_argument('--rand_init', dest='rand_init', action='store_true')
+    parser.add_argument('--eps_schedule', type=int, default=0)
 
     # IO args
     parser.add_argument('--last_epoch', type=int, default=0)
@@ -82,18 +84,29 @@ if __name__ == '__main__':
     else:
         loader_train, loader_test, data_details = load_dataset(args, data_dir='data')
 
+    num_channels = data_details['n_channels']
 
-    if args.dataset_in == 'MNIST':
+    if 'MNIST' in args.dataset_in:
         if 'cnn_3l' in args.model:
-            if 'large' in args.model:
-                net = cnn_3l_large(args.n_classes)
-            else:
-                net = cnn_3l(args.n_classes, args.conv_expand, args.fc_expand)
+            # if 'large' in args.model:
+            #     net = cnn_3l_large(args.n_classes)
+            # else:
+            net = cnn_3l(args.n_classes, args.conv_expand, args.fc_expand)
+        elif 'cnn_4l' in args.model:
+            net = cnn_4l(args.n_classes, args.conv_expand, args.fc_expand)
         elif 'wrn' in args.model:
-            net = WideResNet(depth=args.depth, num_classes=args.n_classes, widen_factor=args.width, input_channels=data_details['n_channels'])
+            net = WideResNet(depth=args.depth, num_classes=args.n_classes, 
+                widen_factor=args.width, input_channels=num_channels)
+        elif 'dn' in args.model:
+            net = DenseNet(growthRate=12, depth=35, reduction=1.0,
+                            bottleneck=False, nClasses=args.n_classes, ChannelsIn=num_channels)
     elif args.dataset_in == 'CIFAR-10':
         if 'wrn' in args.model:
-            net = WideResNet(depth=args.depth, num_classes=args.n_classes, widen_factor=args.width, input_channels=data_details['n_channels'])
+            net = WideResNet(depth=args.depth, num_classes=args.n_classes, 
+                widen_factor=args.width, input_channels=num_channels)
+        elif 'dn' in args.model:
+            net = DenseNet(growthRate=12, depth=100, reduction=0.5,
+                            bottleneck=True, nClasses=args.n_classes, ChannelsIn=num_channels)
 
     if 'linf' in args.attack:
         args.epsilon /= 255.
@@ -108,7 +121,7 @@ if __name__ == '__main__':
 
     net.cuda()
 
-    if args.dataset_in == 'MNIST':
+    if 'MNIST' in args.dataset_in:
         summary(net, (1,28,28))
     
     if args.load_checkpoint:
@@ -128,15 +141,25 @@ if __name__ == '__main__':
         lr = update_hyparam(epoch, args)
         optimizer.param_groups[0]['lr'] = lr
         print('Current learning rate: {}'.format(lr))
+        eps, delta = eps_scheduler(epoch, args)
         if not args.is_adv:
             curr_loss = train_one_epoch(net, criterion, optimizer, 
                                   loader_train, verbose=False)
         else:
-            curr_loss = robust_train_one_epoch(net, criterion, optimizer, loader_train, args, verbose=False)
+            curr_loss, ben_loss = robust_train_one_epoch(net, criterion, optimizer, loader_train, args, eps, delta, verbose=False)
         print('time_taken for #{} epoch = {:.3f}'.format(epoch+1, time.time()-start_time))
-        _,_, test_loss = robust_test_during_train(net, criterion, loader_test, args, n_batches=10)
+        acc, acc_adv, test_loss, test_loss_adv = robust_test_during_train(net, criterion, loader_test, args, n_batches=10)
         ckpt_path = 'checkpoint_' + str(args.last_epoch)
         torch.save(net.state_dict(), model_dir_name + ckpt_path)
         writer.add_scalar('Loss/train', curr_loss, epoch)
         writer.add_scalar('Loss/test', test_loss, epoch)
+        writer.add_scalar('Loss/test_adv', test_loss_adv, epoch)
+        writer.add_scalar('Acc/test', acc, epoch)
+        writer.add_scalar('Acc/test_adv', acc_adv, epoch)
         writer.add_scalar('Lr', lr, epoch)
+        if args.is_adv:
+            writer.add_scalar('Loss/train_ben', ben_loss, epoch)
+        else:
+            writer.add_scalar('Loss/train_ben', 0, epoch)
+        print(curr_loss, test_loss, test_loss_adv, acc, acc_adv, lr, ben_loss)
+
