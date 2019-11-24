@@ -149,7 +149,6 @@ class MNIST(VisionDataset):
         if os.path.exists(degree_file_name(args,class_1,class_2)):
             with open(degree_file_name(args,class_1,class_2)) as json_file:
                 degree_data = json.load(json_file)
-                print(degree_data)
         else:
             raise ValueError('No degree details computed')
         first_key = next(iter(degree_data))
@@ -166,7 +165,6 @@ class MNIST(VisionDataset):
                 if count >= args.drop_thresh:
                     break
                 else:
-                    print(k)
                     mask_matched[int(k)] = False
                 count += 1
             print(len(np.where(mask_matched==False)[0]))

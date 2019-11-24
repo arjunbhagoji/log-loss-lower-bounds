@@ -17,7 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 from utils.mnist_models import cnn_3l
 from utils.cifar10_models import WideResNet
 from utils.densenet_model import DenseNet
-from utils.train_utils import train_one_epoch, robust_train_one_epoch, update_hyparam
+from utils.train_utils import train_one_epoch, robust_train_one_epoch, update_hyparam, eps_scheduler
 from utils.test_utils import test, robust_test_during_train
 from utils.data_utils import load_dataset, load_dataset_custom
 from utils.io_utils import init_dirs
