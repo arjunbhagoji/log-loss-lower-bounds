@@ -167,6 +167,7 @@ def load_dataset_numpy(args, data_dir):
         testset = MNIST(root=data_dir, args=args, train=False,
                                 download=False,
                                 np_array=True)
+        data_details = {'n_channels':1, 'h_in':28, 'w_in':28, 'scale':255.0}
     elif args.dataset_in == 'fMNIST':
         trainset = FashionMNIST(root=data_dir, args=args, train=True,
                             download=False,
@@ -174,6 +175,7 @@ def load_dataset_numpy(args, data_dir):
         testset = FashionMNIST(root=data_dir, args=args, train=False,
                                 download=False,
                                 np_array=True)
+        data_details = {'n_channels':1, 'h_in':28, 'w_in':28, 'scale':255.0}
     elif args.dataset_in == 'CIFAR-10':
         trainset = cifar10(root=data_dir, args=args, train=True,
                             download=False, 
@@ -184,4 +186,5 @@ def load_dataset_numpy(args, data_dir):
         testset = cifar10(root=data_dir, args=args,
                                 train=False,
                                 download=False)
-    return trainset, testset
+        data_details = {'n_channels':3, 'h_in':32, 'w_in':32, 'scale':255.0}
+    return trainset, testset, data_details
