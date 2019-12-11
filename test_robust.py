@@ -36,6 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--fc_expand', type=int, default=1)
     parser.add_argument('--depth', type=int, default=28)
     parser.add_argument('--width', type=int, default=10)
+    parser.add_argument('--lr_schedule', type=int, default=0)
     parser.add_argument('--batch_size', type=int, default=128) 
     parser.add_argument('--test_batch_size', type=int, default=128)
     # parser.add_argument('--learning_rate', type=float, default=0.1)
@@ -50,6 +51,11 @@ if __name__ == '__main__':
     parser.add_argument('--is_dropping', dest='dropping', action='store_true')
     parser.add_argument('--rand_init', dest='rand_init', action='store_true')
     parser.add_argument('--eps_schedule', type=int, default=0)
+    parser.add_argument('--dropping_strat', type=str, default='matched')
+    parser.add_argument('--matching_path', type=str, default='matchings')
+    parser.add_argument('--degree_path', type=str, default='degree_results')
+    parser.add_argument("--norm", default='l2', help="norm to be used")
+    parser.add_argument('--drop_thresh', type=int, default=100)
 
     # Attack args
     parser.add_argument('--new_attack', type=str, default='PGD_l2')
