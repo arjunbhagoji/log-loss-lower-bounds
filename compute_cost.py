@@ -16,6 +16,34 @@ import matplotlib.pyplot as plt
 plt.ioff()
 from mpl_toolkits.axes_grid1 import ImageGrid
 
+
+def greedy_ind_set(adj_list, ind_set, graph_track):
+	f5 = open('graph_data/greedy_ind/' + save_file_name + '_{0:.1f}.txt'.format(eps), 'w')
+	sorted_adj_list = sorted(adj_list.items(), key=lambda kv: kv[1][1])
+	# print(sorted_adj_list)
+	# sorted_adj_list = collections.OrderedDict(sorted_adj_list)
+	while len(graph_track)>0:
+		# print(sorted_adj_list)
+		# print(graph_track, ind_set)
+		curr_vertex_data = sorted_adj_list[0]
+		# print(int(curr_vertex_data[0]))
+		ind_set.add(int(curr_vertex_data[0]))
+		if int(curr_vertex_data[0]) in graph_track: 
+			graph_track.remove(int(curr_vertex_data[0]))
+		for i in curr_vertex_data[1][0]:
+			if i in graph_track:
+				graph_track.remove(i)
+		for item in sorted_adj_list:
+			if int(item[0]) in curr_vertex_data[1][0]:
+				sorted_adj_list.remove(item)
+				# print(item)
+		sorted_adj_list = sorted_adj_list[1:]
+	print(len(ind_set))
+	for item in ind_set:
+		f5.write(str(item)+',')
+	return ind_set
+
+
 def save_adv_images(cm, indices_1, indices_2, X_c1, X_c2, eps):
 	adv_indices = np.where(cm==0.0)
 	X_1 = X_c1[indices_1[adv_indices]]
@@ -45,28 +73,61 @@ def save_adv_images(cm, indices_1, indices_2, X_c1, X_c2, eps):
 		# else:
 		# 	grid[i].imshow(np.ones(28,28))
 
-	plt.savefig('figures/' + save_file_name + '_eps' + str(eps) + '.png')	
+	plt.savefig('figures/' + save_file_name + '_eps' + str(eps) + '.png')
 
-def data_details():
-	if 'MNIST' in args.dataset_in:
-		IMAGE_ROWS = 28
-		IMAGE_COLS = 28
-		NUM_CHANNELS = 1
-		DATA_DIM = IMAGE_ROWS*IMAGE_COLS*NUM_CHANNELS
-	elif args.dataset_in == 'CIFAR-10':
-		IMAGE_ROWS = 32
-		IMAGE_COLS = 32
-		NUM_CHANNELS = 3
-		DATA_DIM = IMAGE_ROWS*IMAGE_COLS*NUM_CHANNELS
-		NUM_CLASSES = 10
-	elif args.dataset == 'census':
-		X_train, Y_train, X_test, Y_test = data_census()
-		Y_test_uncat = np.argmax(Y_test, axis=1)
-		print(Y_test)
-		print(Y_test_uncat)
-		print('Loaded Census data')
 
-	return DATA_DIM
+def degree_calculate(args, cost_matrix, save_file_name):
+	f3_name = 'graph_data/degree_results/' + save_file_name + '_{0:.1f}.json'.format(eps)
+	f4_name = 'graph_data/adj_list/' + save_file_name + '_{0:.1f}.json'.format(eps)
+	# Vertex degree analysis
+	if not os.path.exists(f3_name):
+		f3 = open(f3_name, 'w')
+		f4 = open(f4_name, 'w')
+		degrees = {}
+		adj_list = {}
+		ind_set = set()
+		ind_set_comp = set(range(2*args.num_samples))
+		deg_list = []
+		for i in range(2*args.num_samples):
+			sample_index = i % args.num_samples
+			if i<args.num_samples:
+				curr_degree = np.sum(cost_matrix[sample_index,:])
+				curr_neighbors = [int(i+args.num_samples) for i in np.where(cost_matrix[sample_index,:]==0)[0]]
+				if len(curr_neighbors)>0:
+					adj_list[str(i)] = [curr_neighbors, int(args.num_samples-curr_degree)]
+				else:
+					ind_set.add(i)
+					ind_set_comp.remove(i)
+				deg_list.append(curr_degree)
+				degrees[str(i)] = curr_degree
+			elif i>=args.num_samples:
+				curr_degree = np.sum(cost_matrix[:,sample_index])
+				curr_neighbors = [int(i) for i in np.where(cost_matrix[:,sample_index]==0)[0]]
+				if len(curr_neighbors)>0:
+					adj_list[str(i)] = [curr_neighbors, int(args.num_samples-curr_degree)]
+				else:
+					ind_set.add(i)
+					ind_set_comp.remove(i)
+				deg_list.append(curr_degree)
+				degrees[str(i)] = curr_degree
+		sorted_degrees = sorted(degrees.items(), key=lambda kv: kv[1])
+		sorted_degrees_dict = collections.OrderedDict(sorted_degrees)
+		# print(sorted_degrees_dict)
+		# print(adj_list)
+		# print(ind_set, ind_set_comp)
+		json.dump(sorted_degrees_dict, f3)
+		json.dump(adj_list, f4)
+		avg_degree_norm = np.mean(deg_list)/args.num_samples
+		loss_lb_loose = (1-avg_degree_norm)/2.0
+		f2.write('{:2.2},{:.4e},{:.4e}\n'.format(eps,avg_degree_norm,loss_lb_loose))
+		f3.close()
+		f4.close()
+	else:
+		with open(f3_name) as json_file1:
+			sorted_degrees_dict = json.load(json_file1)
+		with open(f4_name) as json_file2:
+			adj_list = json.load(json_file2)
+	return sorted_degrees_dict, adj_list, ind_set, ind_set_comp
 
 
 parser = argparse.ArgumentParser()
@@ -81,9 +142,8 @@ parser.add_argument('--approx_only', dest='approx_only', action='store_true')
 
 args = parser.parse_args()
 
-# X_train, Y_train, X_test, Y_test = data_setup()
-DATA_DIM = data_details()
-train_data, test_data = load_dataset_numpy(args, data_dir='data')
+train_data, test_data, data_details = load_dataset_numpy(args, data_dir='data')
+DATA_DIM = data_details['n_channels']*data_details['h_in']*data_details['w_in']
 
 X_train = []
 Y_train = []
@@ -113,7 +173,7 @@ if 'MNIST' in args.dataset_in or 'CIFAR-10' in args.dataset_in:
 
 if args.norm == 'l2' and 'MNIST' in args.dataset_in:
 	# eps_list = np.linspace(3.2,3.8,4)
-	eps_list = np.linspace(4.0,5.0,2)
+	eps_list = np.linspace(4.0,5.0,1)
 	# eps_list=[2.6,2.8]
 elif args.norm == 'l2' and 'CIFAR-10' in args.dataset:
 	eps_list = np.linspace(4.0,10.0,13)
@@ -139,13 +199,13 @@ if not os.path.exists('matchings'):
 if not os.path.exists('figures'):
 	os.makedirs('figures')
 
-if not os.path.exists('degree_results'):
-	os.makedirs('degree_results')
+if not os.path.exists('graph_data'):
+	os.makedirs('graph_data')
 
 f = open('cost_results/' + save_file_name + '.txt', 'a')
 f.write('eps,cost,inf_loss'+'\n')
 
-f2 = open('degree_results/' + save_file_name + '.txt', 'a')
+f2 = open('graph_data/' + save_file_name + '.txt', 'a')
 f2.write('eps,adn,loss_lb_loose'+'\n')
 
 for eps in eps_list:
@@ -153,30 +213,9 @@ for eps in eps_list:
 	cost_matrix = D_12 > 2*eps
 	cost_matrix = cost_matrix.astype(float)
 
-	f3_name = 'degree_results/' + save_file_name + '_{0:.1f}.json'.format(eps)
-	# Vertex degree analysis
-	if not os.path.exists(f3_name):
-		f3 = open(f3_name, 'w')
-		degrees = {}
-		deg_list = []
-		for i in range(2*args.num_samples):
-			sample_index = i % args.num_samples
-			if i<args.num_samples:
-				curr_degree = np.sum(cost_matrix[sample_index,:])
-				deg_list.append(curr_degree)
-				degrees[str(i)] = curr_degree
-			elif i>args.num_samples:
-				curr_degree = np.sum(cost_matrix[:,sample_index])
-				deg_list.append(curr_degree)
-				degrees[str(i)] = curr_degree
-		# print(len(deg_list))
-		sorted_degrees = sorted(degrees.items(), key=lambda kv: kv[1])
-		sorted_degrees_dict = collections.OrderedDict(sorted_degrees)
-		print(sorted_degrees_dict)
-		json.dump(sorted_degrees_dict, f3)
-		avg_degree_norm = np.mean(deg_list)/args.num_samples
-		loss_lb_loose = (1-avg_degree_norm)/2.0
-		f2.write('{:2.2},{:.4e},{:.4e}\n'.format(eps,avg_degree_norm,loss_lb_loose))
+	sorted_degrees_dict, adj_list, ind_set, ind_set_comp = degree_calculate(args, cost_matrix, save_file_name)
+	if not os.path.exists('graph_data/greedy_ind/' + save_file_name + '_{0:.1f}.txt'.format(eps)):
+		ind_set = greedy_ind_set(adj_list, ind_set, ind_set_comp)
 
 	if not args.approx_only:
 		curr_file_name = 'matchings/' + save_file_name + '_{0:.1f}.npy'.format(eps)
@@ -231,4 +270,3 @@ for eps in eps_list:
 
 f.close()
 f2.close()
-f3.close()
