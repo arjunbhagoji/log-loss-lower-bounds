@@ -1,6 +1,6 @@
 import os 
-# os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2,3'
 
 import torch
 import torch.nn as nn
@@ -134,7 +134,9 @@ if __name__ == '__main__':
     ckpt_path = 'checkpoint_' + str(args.last_epoch)
     print(model_dir_name)
     net.load_state_dict(torch.load(model_dir_name + ckpt_path))
+    print('Training data results')
     test(net, loader_train, figure_dir_name)
     robust_test(net, loader_train, args, figure_dir_name, n_batches=10)
-    # test(net, loader_test, figure_dir_name)
-    # robust_test(net, loader_test, args, figure_dir_name, n_batches=10)
+    print('Test data results')
+    test(net, loader_test, figure_dir_name)
+    robust_test(net, loader_test, args, figure_dir_name, n_batches=10)
