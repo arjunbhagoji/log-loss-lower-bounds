@@ -1,2 +1,0 @@
-eps,adn,loss_lb_loose
-4.0,9.8118e-01,9.4111e-03

@@ -1,0 +1,16 @@
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose

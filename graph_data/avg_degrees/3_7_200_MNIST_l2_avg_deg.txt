@@ -1,0 +1,6 @@
+eps,adn,loss_lb_loose
+2.0,1.0000e+00,0.0000e+00
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
+eps,adn,loss_lb_loose
