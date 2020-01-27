@@ -14,7 +14,7 @@ import argparse
 from torchsummary import summary
 from torch.utils.tensorboard import SummaryWriter
 
-from utils.mnist_models import cnn_3l
+from utils.mnist_models import cnn_3l, cnn_3l_bn, lenet5
 from utils.cifar10_models import WideResNet
 from utils.densenet_model import DenseNet
 from utils.train_utils import train_one_epoch, robust_train_one_epoch, update_hyparam, eps_scheduler
@@ -32,7 +32,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_samples', type=int, default=4000)
 
     # Model args
-    parser.add_argument('--model', type=str, default='cnn_3l', choices=['wrn','cnn_3l', 'dn'])
+    parser.add_argument('--model', type=str, default='cnn_3l', choices=['wrn','cnn_3l', 'cnn_3l_bn', 'dn', 'lenet5'])
     parser.add_argument('--conv_expand', type=int, default=1)
     parser.add_argument('--fc_expand', type=int, default=1)
     parser.add_argument('--depth', type=int, default=28)
@@ -44,7 +44,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_batch_size', type=int, default=128)
     parser.add_argument('--train_epochs', type=int, default=20)
     parser.add_argument('--learning_rate', type=float, default=0.1)
-    parser.add_argument('--lr_schedule', type=int, default=0)
+    parser.add_argument('--lr_schedule', type=str, default='linear0')
     parser.add_argument('--weight_decay', type=float, default=2e-4)
 
     # Attack args
@@ -78,7 +78,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.num_samples is None:
         args.num_samples = 'All'
-    model_dir_name, log_dir_name, _ = init_dirs(args)
+    model_dir_name, log_dir_name, _, training_output_dir_name = init_dirs(args, train=True)
     if args.save_checkpoint:
         writer = SummaryWriter(log_dir=log_dir_name)
     print('Training %s' % model_dir_name)
@@ -96,13 +96,14 @@ if __name__ == '__main__':
     num_channels = data_details['n_channels']
 
     if 'MNIST' in args.dataset_in:
-        if 'cnn_3l' in args.model:
-            # if 'large' in args.model:
-            #     net = cnn_3l_large(args.n_classes)
-            # else:
+        if 'cnn_3l_bn' in args.model:
+            net = cnn_3l_bn(args.n_classes, args.conv_expand, args.fc_expand)
+        elif 'cnn_3l' in args.model:
             net = cnn_3l(args.n_classes, args.conv_expand, args.fc_expand)
-        elif 'cnn_4l' in args.model:
-            net = cnn_4l(args.n_classes, args.conv_expand, args.fc_expand)
+        elif 'lenet5' in args.model:
+            net = lenet5(args.n_classes, args.conv_expand, args.fc_expand)
+        # elif 'cnn_4l' in args.model:
+        #     net = cnn_4l(args.n_classes, args.conv_expand, args.fc_expand)
         elif 'wrn' in args.model:
             net = WideResNet(depth=args.depth, num_classes=args.n_classes, 
                 widen_factor=args.width, input_channels=num_channels)
@@ -139,7 +140,8 @@ if __name__ == '__main__':
         net.load_state_dict(torch.load(model_dir_name + ckpt_path))
         robust_test_during_train(net, loader_test, args, n_batches=10)
 
-    criterion = nn.CrossEntropyLoss(reduction='none')  
+    criterion = nn.CrossEntropyLoss(reduction='none')
+    # criterion = nn.CrossEntropyLoss()
 
     optimizer = torch.optim.SGD(net.parameters(),
                                 lr=args.learning_rate,
@@ -153,12 +155,19 @@ if __name__ == '__main__':
         eps, delta = eps_scheduler(epoch, args)
         if not args.is_adv:
             curr_loss = train_one_epoch(net, criterion, optimizer, 
-                                  loader_train, verbose=False)
+                                  loader_train, args, verbose=False)
             ben_loss = curr_loss
         else:
-            curr_loss, ben_loss = robust_train_one_epoch(net, criterion, optimizer, loader_train, args, eps, delta, verbose=False)
+            curr_loss, ben_loss = robust_train_one_epoch(net, criterion, 
+                                    optimizer, loader_train, args, eps, delta, 
+                                    epoch, training_output_dir_name, verbose=False)
         print('time_taken for #{} epoch = {:.3f}'.format(epoch+1, time.time()-start_time))
-        acc, acc_adv, test_loss, test_loss_adv = robust_test_during_train(net, criterion, loader_test, args, n_batches=10)
+        print('Test set validation')
+        acc, acc_adv, test_loss, test_loss_adv = robust_test_during_train(net, 
+            criterion, loader_test, args, n_batches=10)
+        print('Training set validation')
+        acc, acc_adv, test_loss, test_loss_adv = robust_test_during_train(net, 
+            criterion, loader_train, args)
         ckpt_path = 'checkpoint_' + str(args.last_epoch)
         if args.save_checkpoint:
             torch.save(net.state_dict(), model_dir_name + ckpt_path)
@@ -174,4 +183,3 @@ if __name__ == '__main__':
                 writer.add_scalar('Loss/train_ben', 0, epoch)
         print('Train loss - Adv: %s Ben: %s; Test loss - Adv: %s; Ben: %s' %
             (curr_loss, ben_loss, test_loss_adv, test_loss))
-
