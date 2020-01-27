@@ -73,12 +73,12 @@ def save_adv_images(cm, indices_1, indices_2, X_c1, X_c2, eps):
 		# else:
 		# 	grid[i].imshow(np.ones(28,28))
 
-	plt.savefig('figures/' + save_file_name + '_eps' + str(eps) + '.png')
+	plt.savefig('images/matching/' + save_file_name + '_eps' + str(eps) + '.png')
 
 
 def degree_calculate(args, cost_matrix, save_file_name):
-	f3_name = 'graph_data/degree_results/' + save_file_name + '_{0:.1f}.json'.format(eps)
-	f4_name = 'graph_data/adj_list/' + save_file_name + '_{0:.1f}.json'.format(eps)
+	f3_name = 'graph_data/degree_results/' + save_file_name + '_{0:.1f}'.format(eps) + '_deg_data.json'
+	f4_name = 'graph_data/adj_list/' + save_file_name + '_{0:.1f}'.format(eps) + '_adj_list.json'
 	# Vertex degree analysis
 	if not os.path.exists(f3_name):
 		f3 = open(f3_name, 'w')
@@ -86,25 +86,26 @@ def degree_calculate(args, cost_matrix, save_file_name):
 		degrees = {}
 		adj_list = {}
 		ind_set = set()
-		ind_set_comp = set(range(2*args.num_samples))
+		ind_set_comp = set(range(2*num_samples))
 		deg_list = []
-		for i in range(2*args.num_samples):
-			sample_index = i % args.num_samples
-			if i<args.num_samples:
+		for i in range(2*num_samples):
+			sample_index = i % num_samples
+			if i<num_samples:
 				curr_degree = np.sum(cost_matrix[sample_index,:])
-				curr_neighbors = [int(i+args.num_samples) for i in np.where(cost_matrix[sample_index,:]==0)[0]]
+				curr_neighbors = [int(i+num_samples) for i in np.where(cost_matrix[sample_index,:]==0)[0]]
 				if len(curr_neighbors)>0:
-					adj_list[str(i)] = [curr_neighbors, int(args.num_samples-curr_degree)]
+					adj_list[str(i)] = [curr_neighbors, int(num_samples-curr_degree)]
 				else:
+					# Adding to ind set if no neighbors
 					ind_set.add(i)
 					ind_set_comp.remove(i)
 				deg_list.append(curr_degree)
 				degrees[str(i)] = curr_degree
-			elif i>=args.num_samples:
+			elif i>=num_samples:
 				curr_degree = np.sum(cost_matrix[:,sample_index])
 				curr_neighbors = [int(i) for i in np.where(cost_matrix[:,sample_index]==0)[0]]
 				if len(curr_neighbors)>0:
-					adj_list[str(i)] = [curr_neighbors, int(args.num_samples-curr_degree)]
+					adj_list[str(i)] = [curr_neighbors, int(num_samples-curr_degree)]
 				else:
 					ind_set.add(i)
 					ind_set_comp.remove(i)
@@ -117,7 +118,7 @@ def degree_calculate(args, cost_matrix, save_file_name):
 		# print(ind_set, ind_set_comp)
 		json.dump(sorted_degrees_dict, f3)
 		json.dump(adj_list, f4)
-		avg_degree_norm = np.mean(deg_list)/args.num_samples
+		avg_degree_norm = np.mean(deg_list)/num_samples
 		loss_lb_loose = (1-avg_degree_norm)/2.0
 		f2.write('{:2.2},{:.4e},{:.4e}\n'.format(eps,avg_degree_norm,loss_lb_loose))
 		f3.close()
@@ -139,19 +140,30 @@ parser.add_argument('--num_samples', type=int, default=None)
 parser.add_argument('--n_classes', type=int, default=2)
 parser.add_argument('--eps', type=float, default=None)
 parser.add_argument('--approx_only', dest='approx_only', action='store_true')
+parser.add_argument('--use_test', dest='use_test', action='store_true')
 
 args = parser.parse_args()
 
 train_data, test_data, data_details = load_dataset_numpy(args, data_dir='data')
 DATA_DIM = data_details['n_channels']*data_details['h_in']*data_details['w_in']
 
-X_train = []
-Y_train = []
-for (x,y) in train_data:
-	X_train.append(x/255.)
-	Y_train.append(y)
-X_train = np.array(X_train)
-Y_train = np.array(Y_train)
+X = []
+Y = []
+
+if args.use_test:
+	for (x,y,_, _) in test_data:
+		X.append(x/255.)
+		Y.append(y)
+else:
+	for (x,y,_, _) in train_data:
+		X.append(x/255.)
+		Y.append(y)
+
+X = np.array(X)
+Y = np.array(Y)
+
+num_samples = int(len(X)/2)
+print(num_samples)
 
 if not os.path.exists('distances'):
 	os.makedirs('distances')
@@ -159,9 +171,12 @@ if not os.path.exists('distances'):
 if 'MNIST' in args.dataset_in or 'CIFAR-10' in args.dataset_in:
 	class_1 = 3
 	class_2 = 7
-	dist_mat_name = args.dataset_in + '_' + str(class_1) + '_' + str(class_2) + '_' + str(args.num_samples) + '_' + args.norm + '.npy'
-	X_c1 = X_train[:args.num_samples].reshape(args.num_samples, DATA_DIM)
-	X_c2 = X_train[args.num_samples:].reshape(args.num_samples, DATA_DIM)
+	if args.use_test:
+		dist_mat_name = args.dataset_in + '_test_' + str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.norm + '.npy'
+	else:
+		dist_mat_name = args.dataset_in + '_' + str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.norm + '.npy'
+	X_c1 = X[:num_samples].reshape(num_samples, DATA_DIM)
+	X_c2 = X[num_samples:].reshape(num_samples, DATA_DIM)
 	if os.path.exists(dist_mat_name):
 		D_12 = np.load('distances/' + dist_mat_name)
 	else:
@@ -173,7 +188,7 @@ if 'MNIST' in args.dataset_in or 'CIFAR-10' in args.dataset_in:
 
 if args.norm == 'l2' and 'MNIST' in args.dataset_in:
 	# eps_list = np.linspace(3.2,3.8,4)
-	eps_list = np.linspace(4.0,5.0,1)
+	eps_list = np.linspace(4.0,5.0,2)
 	# eps_list=[2.6,2.8]
 elif args.norm == 'l2' and 'CIFAR-10' in args.dataset:
 	eps_list = np.linspace(4.0,10.0,13)
@@ -187,8 +202,12 @@ if args.eps is not None:
 
 print(eps_list)
 
-save_file_name = str(class_1) + '_' + str(class_2) + '_' + str(args.num_samples) + '_' + args.dataset_in + '_' + args.norm
-save_file_name_c0 = str(class_1) + '_' + str(class_2) + '_' + str(args.num_samples) + '_' + args.dataset_in + '_' + args.norm + '_cost_zero'
+if args.use_test:
+	save_file_name = str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.dataset_in + '_test_' + args.norm
+	save_file_name_c0 = str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.dataset_in + '_test_' + args.norm + '_cost_zero'
+else:
+	save_file_name = str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.dataset_in + '_' + args.norm
+	save_file_name_c0 = str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.dataset_in + '_' + args.norm + '_cost_zero'
 
 if not os.path.exists('cost_results'):
 	os.makedirs('cost_results')
@@ -205,7 +224,7 @@ if not os.path.exists('graph_data'):
 f = open('cost_results/' + save_file_name + '.txt', 'a')
 f.write('eps,cost,inf_loss'+'\n')
 
-f2 = open('graph_data/' + save_file_name + '.txt', 'a')
+f2 = open('graph_data/avg_degrees/' + save_file_name + '_avg_deg' + '.txt', 'a')
 f2.write('eps,adn,loss_lb_loose'+'\n')
 
 for eps in eps_list:
@@ -213,10 +232,13 @@ for eps in eps_list:
 	cost_matrix = D_12 > 2*eps
 	cost_matrix = cost_matrix.astype(float)
 
-	sorted_degrees_dict, adj_list, ind_set, ind_set_comp = degree_calculate(args, cost_matrix, save_file_name)
-	if not os.path.exists('graph_data/greedy_ind/' + save_file_name + '_{0:.1f}.txt'.format(eps)):
-		ind_set = greedy_ind_set(adj_list, ind_set, ind_set_comp)
+	# Perform all pre-computation before matching
+	# sorted_degrees_dict, adj_list, ind_set, ind_set_comp = degree_calculate(args, cost_matrix, save_file_name)
+	# if not os.path.exists('graph_data/greedy_ind/' + save_file_name + '_{0:.1f}.txt'.format(eps)):
+	# 	ind_set = greedy_ind_set(adj_list, ind_set, ind_set_comp)
+	#To-do: read in the ind set file
 
+	# Decide if matching is to be carried out
 	if not args.approx_only:
 		curr_file_name = 'matchings/' + save_file_name + '_{0:.1f}.npy'.format(eps)
 		curr_file_name_c0 = 'matchings/' + save_file_name_c0 + '_{0:.1f}.npy'.format(eps)
@@ -238,13 +260,13 @@ for eps in eps_list:
 
 			time2 = time.time()
 
-			print('Time taken for %s examples per class for eps %s is %s' % (args.num_samples, eps, time2-time1))
+			print('Time taken for %s examples per class for eps %s is %s' % (num_samples, eps, time2-time1))
 
 		raw_cost = np.float(cost_matrix[output[0], output[1]].sum())
 
 		# save_adv_images(costs, output[0], output[1], X_c1, X_c2, eps)
 
-		mean_cost = raw_cost/(args.num_samples)
+		mean_cost = raw_cost/(num_samples)
 
 		min_error = (1-mean_cost)/2
 
@@ -253,20 +275,20 @@ for eps in eps_list:
 		f.write(str(eps)+','+str(mean_cost)+','+str(min_error) + '\n')
 
 		# Intersection analysis
-		matching_indices[1] += args.num_samples
-		no_matched = 2*len(matching_indices[0])
-		print(no_matched)
-		matching_indices = matching_indices.reshape(no_matched)
-		# print(matching_indices)
-		lowest_degree_indices = []
-		count = 0
-		for k,v in sorted_degrees_dict.items():
-			if count < no_matched:
-				lowest_degree_indices.append(int(k))
-			count += 1
-		# print(lowest_degree_indices)
-		intersection = np.intersect1d(matching_indices,lowest_degree_indices)
-		print(len(intersection))
+		# matching_indices[1] += num_samples
+		# no_matched = 2*len(matching_indices[0])
+		# print(no_matched)
+		# matching_indices = matching_indices.reshape(no_matched)
+		# # print(matching_indices)
+		# lowest_degree_indices = []
+		# count = 0
+		# for k,v in sorted_degrees_dict.items():
+		# 	if count < no_matched:
+		# 		lowest_degree_indices.append(int(k))
+		# 	count += 1
+		# # print(lowest_degree_indices)
+		# intersection = np.intersect1d(matching_indices,lowest_degree_indices)
+		# print(len(intersection))
 
 f.close()
 f2.close()
