@@ -18,7 +18,7 @@ from utils.mnist_models import cnn_3l, cnn_3l_bn, lenet5
 from utils.cifar10_models import WideResNet
 from utils.densenet_model import DenseNet
 from utils.train_utils import train_one_epoch, robust_train_one_epoch, update_hyparam, eps_scheduler
-from utils.test_utils import test, robust_test_during_train
+from utils.test_utils import test, robust_test, robust_test_hybrid
 from utils.data_utils import load_dataset, load_dataset_custom
 from utils.io_utils import init_dirs
 
@@ -58,6 +58,7 @@ if __name__ == '__main__':
     parser.add_argument('--clip_max', type=float, default=1.0)
     parser.add_argument('--rand_init', dest='rand_init', action='store_true')
     parser.add_argument('--eps_schedule', type=int, default=0)
+    parser.add_argument('--num_restarts', type=int, default=1)
 
     # IO args
     parser.add_argument('--last_epoch', type=int, default=0)
@@ -78,7 +79,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.num_samples is None:
         args.num_samples = 'All'
-    model_dir_name, log_dir_name, _, training_output_dir_name = init_dirs(args, train=True)
+
+    if 'hybrid' in args.attack:
+        args.track_hard = True
+
+    attack_params = {'attack': args.attack, 'epsilon': args.epsilon, 
+                     'attack_iter': args.attack_iter, 'eps_step': args.eps_step,
+                     'targeted': args.targeted, 'clip_min': args.clip_min,
+                     'clip_max': args.clip_max,'rand_init': args.rand_init, 
+                     'num_restarts': args.num_restarts}
+
+    model_dir_name, log_dir_name, figure_dir_name, training_output_dir_name = init_dirs(args, train=True)
     if args.save_checkpoint:
         writer = SummaryWriter(log_dir=log_dir_name)
     print('Training %s' % model_dir_name)
@@ -90,6 +101,9 @@ if __name__ == '__main__':
     
     if args.n_classes != 10:
         loader_train, loader_test, data_details = load_dataset_custom(args, data_dir='data')
+        args.dropping = False
+        # args.track_hard = True
+        loader_train_all, _, _ = load_dataset_custom(args, data_dir='data')
     else:
         loader_train, loader_test, data_details = load_dataset(args, data_dir='data')
 
@@ -147,6 +161,7 @@ if __name__ == '__main__':
                                 lr=args.learning_rate,
                                 momentum=0.9,
                                 weight_decay=args.weight_decay)
+    
     for epoch in range(args.curr_epoch, args.train_epochs):
         start_time = time.time()
         lr = update_hyparam(epoch, args)
@@ -162,24 +177,34 @@ if __name__ == '__main__':
                                     optimizer, loader_train, args, eps, delta, 
                                     epoch, training_output_dir_name, verbose=False)
         print('time_taken for #{} epoch = {:.3f}'.format(epoch+1, time.time()-start_time))
+        n_batches_eval = 10
+        if 'dn' in args.model:
+            n_batches_eval = 5
+        if 'hybrid' in args.attack:
+            f_eval = robust_test_hybrid
+        else:
+            f_eval = robust_test
         print('Test set validation')
-        acc, acc_adv, test_loss, test_loss_adv = robust_test_during_train(net, 
-            criterion, loader_test, args, n_batches=10)
+        # Running validation
+        acc_test, acc_adv_test, test_loss, test_loss_adv = f_eval(net, 
+            criterion, loader_test, args, attack_params, epoch, training_output_dir_name, 
+            None,n_batches=n_batches_eval, train_data=False, training_time=True) 
         print('Training set validation')
-        acc, acc_adv, test_loss, test_loss_adv = robust_test_during_train(net, 
-            criterion, loader_train, args)
+        acc_train, acc_adv_train, train_loss, train_loss_adv = f_eval(net, 
+            criterion, loader_train_all, args, attack_params, epoch, training_output_dir_name, 
+            None, n_batches=n_batches_eval, train_data=True, training_time=True)
         ckpt_path = 'checkpoint_' + str(args.last_epoch)
         if args.save_checkpoint:
             torch.save(net.state_dict(), model_dir_name + ckpt_path)
-            writer.add_scalar('Loss/train', curr_loss, epoch)
+            writer.add_scalar('Loss/train', train_loss_adv, epoch)
             writer.add_scalar('Loss/test', test_loss, epoch)
             writer.add_scalar('Loss/test_adv', test_loss_adv, epoch)
-            writer.add_scalar('Acc/test', acc, epoch)
-            writer.add_scalar('Acc/test_adv', acc_adv, epoch)
+            writer.add_scalar('Acc/test', acc_test, epoch)
+            writer.add_scalar('Acc/test_adv', acc_adv_test, epoch)
             writer.add_scalar('Lr', lr, epoch)
             if args.is_adv:
-                writer.add_scalar('Loss/train_ben', ben_loss, epoch)
+                writer.add_scalar('Loss/train_ben', train_loss, epoch)
             else:
                 writer.add_scalar('Loss/train_ben', 0, epoch)
         print('Train loss - Adv: %s Ben: %s; Test loss - Adv: %s; Ben: %s' %
-            (curr_loss, ben_loss, test_loss_adv, test_loss))
+            (train_loss_adv, train_loss, test_loss_adv, test_loss))
