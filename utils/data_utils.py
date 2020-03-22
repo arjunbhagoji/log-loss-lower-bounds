@@ -104,24 +104,20 @@ def load_mnist_dataset_custom(args, data_dir, training=True):
         trainset = MNIST(root=data_dir, args=args, train=True,
                                     download=False, 
                                     transform=transforms.ToTensor(),
-                                    dropping=args.dropping,
-                                    training=training)
+                                    dropping=args.dropping)
         testset = MNIST(root=data_dir, args=args, train=False,
                             download=False, 
                             transform=transforms.ToTensor(),
-                            dropping=args.dropping,
-                            training=False)
+                            dropping=args.dropping)
     elif args.dataset_in == 'fMNIST':
         trainset = FashionMNIST(root=data_dir, args=args, train=True,
                                     download=False, 
                                     transform=transforms.ToTensor(),
-                                    dropping=args.dropping,
-                                    training=training)
+                                    dropping=args.dropping)
         testset = FashionMNIST(root=data_dir, args=args, train=False,
                             download=False, 
                             transform=transforms.ToTensor(),
-                            dropping=args.dropping,
-                            training=False)
+                            dropping=args.dropping)
 
     loader_train = torch.utils.data.DataLoader(trainset, 
                                 batch_size=args.batch_size,
@@ -186,5 +182,41 @@ def load_dataset_numpy(args, data_dir):
         testset = cifar10(root=data_dir, args=args,
                                 train=False,
                                 download=False)
+        data_details = {'n_channels':3, 'h_in':32, 'w_in':32, 'scale':255.0}
+    return trainset, testset, data_details
+
+def load_dataset_tensor(args, data_dir):
+    if args.dataset_in == 'MNIST':
+        trainset = MNIST(root=data_dir, args=args, train=True,
+                            download=False,
+                            np_array=True,
+                            transform=transforms.ToTensor())
+        testset = MNIST(root=data_dir, args=args, train=False,
+                                download=False,
+                                np_array=True,
+                                transform=transforms.ToTensor())
+        data_details = {'n_channels':1, 'h_in':28, 'w_in':28, 'scale':255.0}
+    elif args.dataset_in == 'fMNIST':
+        trainset = FashionMNIST(root=data_dir, args=args, train=True,
+                            download=False,
+                            np_array=True,
+                            transform=transforms.ToTensor())
+        testset = FashionMNIST(root=data_dir, args=args, train=True,
+                                download=False,
+                                np_array=True, 
+                                transform=transforms.ToTensor())
+        data_details = {'n_channels':1, 'h_in':28, 'w_in':28, 'scale':255.0}
+    elif args.dataset_in == 'CIFAR-10':
+        trainset = cifar10(root=data_dir, args=args, train=True,
+                            download=False, 
+                            transform=transforms.Compose([
+                                transforms.RandomHorizontalFlip(),
+                                transforms.RandomCrop(32, 4),
+                                transforms.ToTensor()
+                            ]))
+        testset = cifar10(root=data_dir, args=args,
+                                train=False,
+                                download=False,
+                                transform=transforms.ToTensor())
         data_details = {'n_channels':3, 'h_in':32, 'w_in':32, 'scale':255.0}
     return trainset, testset, data_details
