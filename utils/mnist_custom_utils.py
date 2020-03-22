@@ -61,7 +61,7 @@ class MNIST(VisionDataset):
         return self.data
 
     def __init__(self, root, args, train=True, transform=None, target_transform=None,
-                 download=False, np_array=False, dropping=False, training=True):
+                 download=False, np_array=False, dropping=False):
         super(MNIST, self).__init__(root, transform=transform,
                                     target_transform=target_transform)
         self.train = train  # training set or test set
@@ -78,23 +78,28 @@ class MNIST(VisionDataset):
             data_file = self.training_file
         else:
             data_file = self.test_file
+        
         self.data, self.targets = torch.load(os.path.join(self.processed_folder, data_file))
 
-        self.data, self.targets = self._two_c_filter(args)
+        self.data, self.targets, num_samples = self._two_c_filter(args)
 
         self.dropping = dropping
 
-        self.easy_idx = np.ones(2*args.num_samples,dtype=bool)
+        self.easy_idx = np.ones(2*num_samples,dtype=bool)
 
-        if training:
-            if args.track_hard or self.dropping:
-                print(len(self.data))
-                if args.dropping_strat == 'matched':
-                    self.data, self.targets, self.easy_idx = self._matching_filter(args)
-                elif args.dropping_strat == 'approx':
-                    print('Using approx filtering')
-                    self.data, self.targets, self.easy_idx = self._degree_filter(args)
-                print(len(self.data))
+        self.matched_idx = -1*np.ones(2*num_samples)
+
+        if args.track_hard or self.dropping:
+            # print(len(self.data))
+            if args.dropping_strat == 'matched':
+                self.data, self.targets = self._matching_filter(args, num_samples)
+            elif args.dropping_strat == 'approx':
+                print('Using approx filtering')
+                self.data, self.targets = self._degree_filter(args, num_samples)
+            elif args.dropping_strat == 'random':
+                print('Dropping random points')
+                self.data, self.targets = self._random_filter(args, num_samples)
+        # print('No. of samples in use: {}'.format(len(self.data)))  
 
     def _two_c_filter(self, args):
         class_1 = 3
@@ -106,9 +111,14 @@ class MNIST(VisionDataset):
         X_c1 = self.data[c1_idx]
         X_c2 = self.data[c2_idx]
 
+        num_samples = args.num_samples
+        if len(X_c1) < args.num_samples or len(X_c2) < args.num_samples:
+            num_samples = min(len(X_c1),len(X_c2))
+            # print('Culling number of samples to {}'.format(num_samples))
+
         if args.num_samples is not None:
-            X_c1 = X_c1[:args.num_samples]
-            X_c2 = X_c2[:args.num_samples]
+            X_c1 = X_c1[:num_samples]
+            X_c2 = X_c2[:num_samples]
 
         curr_data = np.vstack((X_c1,X_c2))
         # curr_data = X_c1.extend(X_c2)
@@ -120,56 +130,64 @@ class MNIST(VisionDataset):
         curr_labels = Y_curr.tolist()
         curr_labels = [int(x) for x in curr_labels]
         
-        return curr_data, curr_labels
+        return curr_data, curr_labels, num_samples
 
-    def _matching_filter(self, args):
+    def _matching_filter(self, args, num_samples):
         class_1 = 3
         class_2 = 7
-        mask_matched = np.ones(2*args.num_samples,dtype=bool)
-        if os.path.exists(matching_file_name(args,class_1,class_2)):
-            output = np.load(matching_file_name(args, class_1, class_2))
+        mask_matched = np.ones(2*num_samples,dtype=bool)
+        # print(matching_file_name(args,class_1,class_2, self.train, num_samples))
+        if os.path.exists(matching_file_name(args,class_1,class_2, self.train, num_samples)):
+            output = np.load(matching_file_name(args, class_1, class_2, self.train, num_samples))
         else:
             raise ValueError('No matching computed')
         num_matched = len(output[0])
         if num_matched == 0:
             print('No matching')
-            return self.data, self.targets, mask_matched
+            return self.data, self.targets
         else:
+            # Dropping at random
             for i in range(num_matched):
                 coin = np.random.random_sample()
                 if coin < 0.5:
                     mask_matched[output[0][i]] = False
                 else:
-                    mask_matched[args.num_samples+output[1][i]] = False
-            print(len(np.where(mask_matched==False)[0]))
-            if self.dropping:
+                    mask_matched[num_samples+output[1][i]] = False
+                # Marking hard samples
+                self.easy_idx[output[0][i]] = False
+                self.easy_idx[num_samples+output[1][i]] = False
+                self.matched_idx[output[0][i]] = num_samples+output[1][i]
+                self.matched_idx[num_samples+output[1][i]] = output[0][i]
+            # print(len(np.where(mask_matched==False)[0]))
+            if self.dropping and self.train:
                 print('Filtering training data')
                 curr_data = self.data[mask_matched]
                 curr_labels = np.array(self.targets)
                 curr_labels = curr_labels[mask_matched]
-                easy_idx = np.ones(2*args.num_samples,dtype=bool)[mask_matched]
-                return curr_data, curr_labels, easy_idx
+                self.easy_idx = self.easy_idx[mask_matched]
+                print('Length of data after dropping:{}'.format(len(curr_data)))    
+                return curr_data, curr_labels
             else:
-                return self.data, self.targets, mask_matched
+                return self.data, self.targets
 
-    def _degree_filter(self, args):
+    def _degree_filter(self, args, num_samples):
         class_1 = 3
         class_2 = 7
-        mask_matched = np.ones(2*args.num_samples,dtype=bool)
-        if os.path.exists(degree_file_name(args,class_1,class_2)):
-            with open(degree_file_name(args,class_1,class_2)) as json_file:
+        mask_matched = np.ones(2*num_samples,dtype=bool)
+        if os.path.exists(degree_file_name(args,class_1,class_2, self.train, num_samples)):
+            with open(degree_file_name(args,class_1,class_2, self.train, num_samples)) as json_file:
                 degree_data = json.load(json_file)
         else:
             raise ValueError('No degree details computed')
         first_key = next(iter(degree_data))
-        if degree_data[first_key] == args.num_samples:
+        if degree_data[first_key] == num_samples:
             print('Only cost 1 edges present')
-            return self.data, self.targets, mask_matched
+            return self.data, self.targets
         else:
             count = 0
             first_time = 2*args.num_samples
             for k,v in degree_data.items():
-                if v == args.num_samples and first_time>count:
+                if v == num_samples and first_time>count:
                     first_time = count
                 if count >= args.drop_thresh:
                     break
@@ -178,10 +196,27 @@ class MNIST(VisionDataset):
                 count += 1
             print(len(np.where(mask_matched==False)[0]))
             print(first_time)
+            if self.dropping and self.train:
+                curr_data = self.data[mask_matched]
+                curr_labels = np.array(self.targets)
+                curr_labels = curr_labels[mask_matched]
+                self.easy_idx = self.easy_idx[mask_matched]
+                return curr_data, curr_labels
+            else:
+                return self.data, self.targets
+
+    def _random_filter(self, args, num_samples):
+        mask_matched = np.ones(2*num_samples,dtype=bool)
+        drop_indices = np.random.choice(2*num_samples, args.drop_thresh, replace=False)
+        mask_matched[drop_indices] = 0
+        if self.dropping and self.train:
             curr_data = self.data[mask_matched]
             curr_labels = np.array(self.targets)
             curr_labels = curr_labels[mask_matched]
-            return curr_data, curr_labels, mask_matched
+            self.easy_idx = self.easy_idx[mask_matched]
+            return curr_data, curr_labels
+        else:
+            return self.data, self.targets
 
     def __getitem__(self, index):
         """
@@ -195,6 +230,8 @@ class MNIST(VisionDataset):
         
         easy_indc = self.easy_idx[index]
 
+        matched_idx_curr = int(self.matched_idx[index])
+
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
         if not self.np_array:
@@ -206,7 +243,7 @@ class MNIST(VisionDataset):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        return img, target, easy_indc
+        return img, target, index, easy_indc, matched_idx_curr
 
     def __len__(self):
         return len(self.data)
