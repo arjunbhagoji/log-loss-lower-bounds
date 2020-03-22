@@ -10,6 +10,8 @@ def model_naming(args):
 			model_name += '-conv' + str(args.conv_expand) + '-fc' + str(args.fc_expand) 
 	if args.lr_schedule != 'linear0':
 		model_name += '_lr-sch' + str(args.lr_schedule)
+	if args.attack != 'PGD_l2' and args.attack != 'PGD_linf':
+		model_name += '_' + str(args.attack)
 	if args.is_adv:
 		model_name += '_robust' + '_eps' + str(args.epsilon) + '_k' + str(args.attack_iter) + '_delta' + str(args.eps_step)
 	if args.eps_schedule != 0:
@@ -20,11 +22,15 @@ def model_naming(args):
 		model_name += '_cl' + str(args.n_classes)
 	if args.num_samples != 2000:
 		model_name += '_ns' + str(args.num_samples)
+	if args.num_restarts != 1:
+		model_name += '_restart' + str(args.num_restarts)
 	if args.dropping:
 		if args.dropping_strat == 'matched':
 			model_name += '_matching'
 		elif args.dropping_strat == 'approx':
 			model_name += '_approx' + str(args.drop_thresh)
+		elif args.dropping_strat == 'random':
+			model_name += '_random' + str(args.drop_thresh)
 	model_name_base = model_name
 	if args.trial_num is not None:
 		model_name += '_tr' + str(args.trial_num)
@@ -34,11 +40,11 @@ def model_naming(args):
 
 def init_dirs(args, train=True):
 	model_name, model_name_base = model_naming(args)
-	model_dir_name = args.checkpoint_path + '/' + args.dataset_in + '/' + model_name
-	log_dir_name = 'logs' + '/' + args.dataset_in + '/' + model_name
-	figure_dir_name = 'images' + '/' + args.attack + '/' + args.dataset_in + '/' + model_name
+	model_dir_name = args.checkpoint_path + '/' + args.dataset_in + '/' + model_name_base + '/' + model_name
+	log_dir_name = 'logs' + '/' + args.dataset_in + '/' + model_name_base + '/' + model_name
+	figure_dir_name = 'images' + '/' + args.attack + '/' + args.dataset_in + '/' + model_name_base + '/' + model_name
 	# if args.track_hard:
-	training_output_dir_name = 'training_output' + '/' + args.dataset_in + '/' + model_name
+	training_output_dir_name = 'training_output' + '/' + args.dataset_in + '/' + model_name_base + '/' + model_name
 	if train:
 		if args.save_checkpoint:
 			if not os.path.exists(model_dir_name):
