@@ -141,6 +141,7 @@ parser.add_argument('--n_classes', type=int, default=2)
 parser.add_argument('--eps', type=float, default=None)
 parser.add_argument('--approx_only', dest='approx_only', action='store_true')
 parser.add_argument('--use_test', dest='use_test', action='store_true')
+parser.add_argument('--track_hard', dest='track_hard', action='store_true')
 
 args = parser.parse_args()
 
@@ -151,11 +152,11 @@ X = []
 Y = []
 
 if args.use_test:
-	for (x,y,_, _) in test_data:
+	for (x,y,_, _, _) in test_data:
 		X.append(x/255.)
 		Y.append(y)
 else:
-	for (x,y,_, _) in train_data:
+	for (x,y,_, _, _) in train_data:
 		X.append(x/255.)
 		Y.append(y)
 
@@ -233,9 +234,9 @@ for eps in eps_list:
 	cost_matrix = cost_matrix.astype(float)
 
 	# Perform all pre-computation before matching
-	# sorted_degrees_dict, adj_list, ind_set, ind_set_comp = degree_calculate(args, cost_matrix, save_file_name)
-	# if not os.path.exists('graph_data/greedy_ind/' + save_file_name + '_{0:.1f}.txt'.format(eps)):
-	# 	ind_set = greedy_ind_set(adj_list, ind_set, ind_set_comp)
+	sorted_degrees_dict, adj_list, ind_set, ind_set_comp = degree_calculate(args, cost_matrix, save_file_name)
+	if not os.path.exists('graph_data/greedy_ind/' + save_file_name + '_{0:.1f}.txt'.format(eps)):
+		ind_set = greedy_ind_set(adj_list, ind_set, ind_set_comp)
 	#To-do: read in the ind set file
 
 	# Decide if matching is to be carried out
