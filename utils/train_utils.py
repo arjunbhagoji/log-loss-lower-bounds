@@ -70,7 +70,9 @@ def robust_train_one_epoch(model, loss_fn, optimizer, loader_train, args, eps,
     losses_ben = []
     model.train()
     if 'hybrid' in args.attack:
-      trainset, testset, data_details = load_dataset_tensor(args, data_dir='data')
+      training_time=True
+      trainset, testset, data_details = load_dataset_tensor(args, 
+                                    data_dir='data', training_time=training_time)
       print('Data loaded for hybrid attack of len {}'.format(len(trainset)))
     for t, (x, y, idx, ez, m) in enumerate(loader_train):
         x = x.cuda()

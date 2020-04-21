@@ -165,10 +165,11 @@ def hybrid_attack(matched_x, ez, m, data_loader, eps):
         matched_data.append(x_curr)
         matched_labels.append(y_curr)
     matched_data = torch.stack(matched_data).cuda()
-    
+
     # Construct the perturbation
     diff_vec = matched_data-matched_x
     diff_vec_norm = torch.max(diff_vec.view(diff_vec.size(0), -1).norm(2, 1), torch.tensor(1e-9).cuda())
+    # print(diff_vec_norm)
     diff_vec_dir = diff_vec/diff_vec_norm.view(diff_vec.size(0),1,1,1)
     x_mod = matched_x + eps * diff_vec_dir
 

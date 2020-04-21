@@ -81,7 +81,7 @@ def test(model, loader, figure_dir_name):
         num_correct,
         num_samples,
         ))
-    return acc
+    return 100.*acc
 
 def robust_test_hybrid(model, loss_fn, loader, args, att_dir, epoch=0, training_output_dir_name=None, 
                       figure_dir_name=None, n_batches=0, train_data=False, 
@@ -93,16 +93,16 @@ def robust_test_hybrid(model, loss_fn, loader, args, att_dir, epoch=0, training_
   model.eval()
   num_correct, num_correct_adv, num_samples = 0, 0, 0
   steps = 1
+
   losses_adv = []
   losses_ben = []
-  if args.track_hard:
-    loss_dict = collections.OrderedDict()
-    pred_dict = {}
-    if training_time:
-      f_name = training_output_dir_name + 'losses.json'
-      f = open(f_name,'a+')
-      loss_dict['epoch'] = epoch
-  trainset, testset, data_details = load_dataset_tensor(args, data_dir='data')
+  loss_dict = collections.OrderedDict()
+  pred_dict = {}
+  if training_time and args.track_hard:
+    f_name = training_output_dir_name + 'losses.json'
+    f = open(f_name,'a+')
+    loss_dict['epoch'] = epoch
+  trainset, testset, data_details = load_dataset_tensor(args, data_dir='data', training_time=training_time)
   if train_data:
     rel_data = trainset
   else:
@@ -111,15 +111,20 @@ def robust_test_hybrid(model, loss_fn, loader, args, att_dir, epoch=0, training_
       x = x.cuda()
       y = y.cuda()
       x_mod = None
+      gen_adv_flag = False
       # Find matched and unmatched data and labels
       unmatched_x = x[ez]
       unmatched_y = y[ez]
       matched_x = x[~ez]
       matched_y = y[~ez]
       if 'seed' in att_dir['attack']:
-        if len(m[~ez]>0):
-          x_mod = hybrid_attack(matched_x, ez , m, rel_data, args.new_epsilon)
+        gen_adv_flag = True
+        # print('Seeding')
+        if len(m[~ez])>0:
+          x_mod = hybrid_attack(matched_x, ez , m, rel_data, att_dir['epsilon'])
       elif 'replace' in att_dir['attack']:
+        if len(unmatched_x)>0:
+          gen_adv_flag = True
         # Only construct adv. examples for unmatched
         x = x[ez]
         y = y[ez]
@@ -130,20 +135,24 @@ def robust_test_hybrid(model, loss_fn, loader, args, att_dir, epoch=0, training_
                              y_var.cpu(), args).cuda()
       else:
           y_target = y_var
-      if 'PGD_linf' in att_dir['attack']:
-          adv_x = pgd_attack(model, x, x_var, y_target, att_dir['attack_iter'],
-                         att_dir['epsilon'], att_dir['eps_step'], att_dir['clip_min'],
-                         att_dir['clip_max'], att_dir['targeted'], att_dir['rand_init'])
-      elif 'PGD_l2' in att_dir['attack']:
-          adv_x = pgd_l2_attack(model, x, x_var, y_target, att_dir['attack_iter'],
-                         att_dir['epsilon'], att_dir['eps_step'], att_dir['clip_min'],
-                         att_dir['clip_max'], att_dir['targeted'], att_dir['rand_init'], 
-                         att_dir['num_restarts'], x_mod, ez)
+      if gen_adv_flag:
+        if 'PGD_linf' in att_dir['attack']:
+            adv_x = pgd_attack(model, x, x_var, y_target, att_dir['attack_iter'],
+                           att_dir['epsilon'], att_dir['eps_step'], att_dir['clip_min'],
+                           att_dir['clip_max'], att_dir['targeted'], att_dir['rand_init'])
+        elif 'PGD_l2' in att_dir['attack']:
+            adv_x = pgd_l2_attack(model, x, x_var, y_target, att_dir['attack_iter'],
+                           att_dir['epsilon'], att_dir['eps_step'], att_dir['clip_min'],
+                           att_dir['clip_max'], att_dir['targeted'], att_dir['rand_init'], 
+                           att_dir['num_restarts'], x_mod, ez)
       x = torch.cat((unmatched_x,matched_x))
       y = torch.cat((unmatched_y,matched_y))
       if 'replace' in att_dir['attack']:
-        x_mod = hybrid_attack(matched_x, ez, m, rel_data, args.new_epsilon)
-        adv_x = torch.cat((adv_x, x_mod))
+        x_mod = hybrid_attack(matched_x, ez, m, rel_data, att_dir['epsilon'])
+        if gen_adv_flag:
+          adv_x = torch.cat((adv_x, x_mod))
+        else:
+          adv_x = x_mod
       # Predictions
       scores = model(x.cuda()) 
       _, preds = scores.data.max(1)
@@ -151,7 +160,11 @@ def robust_test_hybrid(model, loss_fn, loader, args, att_dir, epoch=0, training_
       _, preds_adv = scores_adv.data.max(1)
       # Losses
       batch_loss_adv = loss_fn(scores_adv, y)
+      loss_adv = torch.mean(batch_loss_adv)
+      losses_adv.append(loss_adv.data.cpu().numpy())
       batch_loss_ben = loss_fn(scores, y)
+      loss_ben = torch.mean(batch_loss_ben)
+      losses_ben.append(loss_ben.data.cpu().numpy())
       # Correct Count
       num_correct += (preds == y).sum()
       num_correct_adv += (preds_adv == y).sum()
@@ -196,18 +209,20 @@ def robust_test_hybrid(model, loss_fn, loader, args, att_dir, epoch=0, training_
       num_samples,
   ))
 
-  if not training_time:
-    hard_point_class_count(pred_dict)
-  if len(loss_dict['batch_losses_hard'])>0:
-    if training_time:
-      json.dump(loss_dict, f)
-      f.write('\n')
-    print('Adv loss easy: %.8f' % np.mean(loss_dict['batch_losses_easy']))
-    print('Adv loss hard: %.8f' % np.mean(loss_dict['batch_losses_hard']))
-    print('Ben loss easy: %.8f' % np.mean(loss_dict['batch_losses_ben_easy']))
-    print('Ben loss hard: %.8f' % np.mean(loss_dict['batch_losses_ben_hard']))
+  if args.track_hard:
+    if not training_time:
+      hard_point_class_count(pred_dict)
+    if len(loss_dict['batch_losses_hard'])>0:
+      print('Reporting hard losses')
+      if training_time:
+        json.dump(loss_dict, f)
+        f.write('\n')
+      print('Adv loss easy: %.8f' % np.mean(loss_dict['batch_losses_easy']))
+      print('Adv loss hard: %.8f' % np.mean(loss_dict['batch_losses_hard']))
+      print('Ben loss easy: %.8f' % np.mean(loss_dict['batch_losses_ben_easy']))
+      print('Ben loss hard: %.8f' % np.mean(loss_dict['batch_losses_ben_hard']))
 
-  return acc, acc_adv, np.mean(losses_ben), np.mean(losses_adv)
+  return 100.*acc, 100.*acc_adv, np.mean(losses_ben), np.mean(losses_adv)
 
 
 def robust_test(model, loss_fn, loader, args, att_dir, epoch=0, training_output_dir_name=None, 
@@ -224,7 +239,7 @@ def robust_test(model, loss_fn, loader, args, att_dir, epoch=0, training_output_
     if args.track_hard:
       loss_dict = collections.OrderedDict()
       pred_dict = {}
-      if training_time:
+      if training_time and args.track_hard:
         f_name = training_output_dir_name + 'losses.json'
         f = open(f_name,'a+')
         loss_dict['epoch'] = epoch
@@ -305,6 +320,7 @@ def robust_test(model, loss_fn, loader, args, att_dir, epoch=0, training_output_
 
     if args.track_hard:
       if not training_time:
+        print('Counting hard points')
         hard_point_class_count(pred_dict)
       if training_time:
         json.dump(loss_dict, f)
@@ -316,132 +332,3 @@ def robust_test(model, loss_fn, loader, args, att_dir, epoch=0, training_output_
         print('Ben loss hard: %.8f' % np.mean(loss_dict['batch_losses_ben_hard']))
 
     return 100.*acc, 100.*acc_adv, np.mean(losses_ben), np.mean(losses_adv)
-
-# def robust_test_during_train(model, loss_fn, loader, args, 
-#               epoch, training_output_dir_name,n_batches=0,train_data=False):
-#     """
-#     n_batches (int): Number of batches for evaluation.
-#     """
-#     model.eval()
-#     num_correct, num_correct_adv, num_samples = 0, 0, 0
-#     steps = 1
-#     losses_adv = []
-#     losses_ben = []
-#     if args.track_hard:
-#       f_name = training_output_dir_name + 'losses.json'
-#       f = open(f_name,'a+')
-#       loss_dict = collections.OrderedDict()
-#       loss_dict['epoch'] = epoch
-#     if 'hybrid' in args.attack:
-#       trainset, testset, data_details = load_dataset_tensor(args, data_dir='data')
-#       if train_data:
-#         rel_data = trainset
-#       else:
-#         rel_data = testset 
-#     for t, (x, y, idx, ez, m) in enumerate(loader):
-#         x = x.cuda()
-#         y = y.cuda()
-#         x_mod = None
-#         if 'hybrid' in args.attack:
-#           # Find matched and unmatched data and labels
-#           unmatched_x = x[ez]
-#           unmatched_y = y[ez]
-#           matched_x = x[~ez]
-#           matched_y = y[~ez]
-#           if 'seed' in args.attack:
-#             if len(m[~ez]>0):
-#               x_mod = hybrid_attack(matched_x, ez , m, rel_data, args.epsilon)
-#           elif 'replace' in args.attack:
-#             # Only construct adv. examples for unmatched
-#             x = x[ez]
-#             y = y[ez]
-#         x_var = Variable(x, requires_grad= True)
-#         y_var = Variable(y, requires_grad=False)
-#         if args.targeted:
-#             y_target = generate_target_label_tensor(
-#                                y_var.cpu(), args).cuda()
-#         else:
-#             y_target = y_var
-#         if 'PGD_linf' in args.attack:
-#             adv_x = pgd_attack(model,
-#                            x,
-#                            x_var,
-#                            y_target,
-#                            args.attack_iter,
-#                            args.epsilon,
-#                            args.eps_step,
-#                            args.clip_min,
-#                            args.clip_max, 
-#                            args.targeted,
-#                            args.rand_init)
-#         elif 'PGD_l2' in args.attack:
-#             adv_x = pgd_l2_attack(model,
-#                            x,
-#                            x_var,
-#                            y_target,
-#                            args.attack_iter,
-#                            args.epsilon,
-#                            args.eps_step,
-#                            args.clip_min,
-#                            args.clip_max, 
-#                            args.targeted,
-#                            args.rand_init,
-#                            args.num_restarts,
-#                            x_mod,
-#                            ez)
-#         if 'hybrid' in args.attack:
-#           x = torch.cat((unmatched_x,matched_x))
-#           y = torch.cat((unmatched_y,matched_y))
-#           if 'replace' in args.attack:
-#             x_mod = hybrid_attack(matched_x, ez, m, rel_data, args.epsilon)
-#             adv_x = torch.cat((adv_x, x_mod))
-#         scores = model(x.cuda()) 
-#         _, preds = scores.data.max(1)
-#         scores_adv = model(adv_x)
-#         _, preds_adv = scores_adv.data.max(1)
-#         batch_loss_adv = loss_fn(scores_adv, y)
-#         loss_adv = torch.mean(batch_loss_adv)
-#         losses_adv.append(loss_adv.data.cpu().numpy())
-#         batch_loss_ben = loss_fn(scores, y)
-#         loss_ben = torch.mean(batch_loss_ben)
-#         losses_ben.append(loss_ben.data.cpu().numpy())
-#         num_correct += (preds == y).sum()
-#         num_correct_adv += (preds_adv == y).sum()
-#         num_samples += len(preds)
-
-#         if args.track_hard:
-#           if 'hybrid' in args.attack:
-#             ez_np = np.ones(len(x), dtype=bool)
-#             ez_np[len(unmatched_x):] = 0
-#           else:
-#             ez_np = ez.data.cpu().numpy()
-
-#           loss_dict = track_hard_losses(ez_np, batch_loss_adv, batch_loss_ben, 
-#                               loss_dict, t)
-#         if n_batches > 0 and steps==n_batches:
-#             break
-#         steps += 1
-
-#     acc = float(num_correct) / num_samples
-#     acc_adv = float(num_correct_adv) / num_samples
-#     print('Clean accuracy: {:.2f}% ({}/{})'.format(
-#         100.*acc,
-#         num_correct,
-#         num_samples,
-#     ))
-#     print('Adversarial accuracy: {:.2f}% ({}/{})'.format(
-#         100.*acc_adv,
-#         num_correct_adv,
-#         num_samples,
-#     ))
-    
-#     if args.track_hard:
-#       json.dump(loss_dict, f)
-#       f.write('\n')
-#       if len(loss_dict['batch_losses_hard'])>0:
-#         print('Adv loss easy: %.8f' % np.mean(loss_dict['batch_losses_easy']))
-#         print('Adv loss hard: %.8f' % np.mean(loss_dict['batch_losses_hard']))
-#         print('Ben loss easy: %.8f' % np.mean(loss_dict['batch_losses_ben_easy']))
-#         print('Ben loss hard: %.8f' % np.mean(loss_dict['batch_losses_ben_hard']))
-
-#     return 100.*acc, 100.*acc_adv, np.mean(losses_ben), np.mean(losses_adv)

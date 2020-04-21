@@ -25,11 +25,11 @@ def model_naming(args):
 	if args.num_restarts != 1:
 		model_name += '_restart' + str(args.num_restarts)
 	if args.dropping:
-		if args.dropping_strat == 'matched':
+		if args.marking_strat == 'matched':
 			model_name += '_matching'
-		elif args.dropping_strat == 'approx':
+		elif args.marking_strat == 'approx':
 			model_name += '_approx' + str(args.drop_thresh)
-		elif args.dropping_strat == 'random':
+		elif args.marking_strat == 'random':
 			model_name += '_random' + str(args.drop_thresh)
 	model_name_base = model_name
 	if args.trial_num is not None:
@@ -61,10 +61,21 @@ def init_dirs(args, train=True):
 		
 def matching_file_name(args, class_1, class_2, train_data, num_samples):
 	if train_data:
-		matching_file_name = args.matching_path + '/' + str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.dataset_in + '_' + args.norm + '_cost_zero_' + '{0:.1f}.npy'.format(args.epsilon)
+		matching_file_name = args.matching_path + '/' + args.dataset_in + '/' + str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.dataset_in + '_' + args.norm + '_cost_zero_' + '{0:.1f}.npy'.format(args.epsilon)
 	else:
-		matching_file_name = args.matching_path + '/' + str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.dataset_in + '_test_' + args.norm + '_cost_zero_' + '{0:.1f}.npy'.format(args.epsilon)
+		matching_file_name = args.matching_path + '/' + args.dataset_in + '/' + str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.dataset_in + '_test_' + args.norm + '_cost_zero_' + '{0:.1f}.npy'.format(args.epsilon)
 	return matching_file_name
+
+def global_matching_file_name(args, class_1, class_2, train_data, num_samples):
+	if train_data:
+		global_matching_file_name = args.matching_path + '/' + args.dataset_in + '/' + str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.norm
+	else:
+		global_matching_file_name = args.matching_path + '/' + args.dataset_in + '/' + str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_test_' + args.norm
+	
+	global_dict_name = global_matching_file_name + '_global_dict.json'
+	global_tuple_name = global_matching_file_name + '_global.npy'
+
+	return global_dict_name, global_tuple_name
 
 def degree_file_name(args, class_1, class_2, train_data, num_samples):
 	if train_data:
@@ -73,3 +84,27 @@ def degree_file_name(args, class_1, class_2, train_data, num_samples):
 		degree_file_name = args.degree_path + '/' + str(class_1) + '_' + str(class_2) + '_' + str(args.num_samples) + '_' + args.dataset_in + '_test_' + args.norm + '_' + '{0:.1f}.json'.format(args.epsilon)
 
 	return degree_file_name
+
+def distance_file_name(args, class_1, class_2, train_data, num_samples):
+	if train_data:
+		dist_file_name = 'distances/' + args.dataset_in + '_' + str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.norm + '.npy'
+	else:
+		dist_file_name = 'distances/' + args.dataset_in + '_test_' + str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.norm + '.npy'
+
+	return dist_file_name
+
+def test_file_save_name(args, model_name):
+	test_output_dir = 'test_output' + '/' + args.dataset_in
+	if not os.path.exists(test_output_dir):
+	    os.makedirs(test_output_dir)
+	test_output_fname = test_output_dir + '/' + model_name + '_' + args.new_attack
+	if 'hybrid' in args.new_attack:
+	    test_output_fname += '_mark_' + args.new_marking_strat
+	if args.eps_step != args.new_eps_step or args.attack_iter != args.new_attack_iter:
+	    test_output_fname += '_delta' + \
+	        str(args.new_eps_step) + '_t' + str(args.new_attack_iter)
+	if args.new_num_restarts != 1:
+	    test_output_fname += '_restart' + str(args.new_num_restarts)
+	test_output_fname += '.txt'
+
+	return test_output_fname

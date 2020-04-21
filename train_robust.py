@@ -23,72 +23,8 @@ from utils.data_utils import load_dataset, load_dataset_custom
 from utils.io_utils import init_dirs
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    
-    # Data args
-    parser.add_argument('--dataset_in', type=str, default='MNIST')
-    parser.add_argument('--n_classes', type=int, default=2)
-    parser.add_argument('--num_samples', type=int, default=4000)
-
-    # Model args
-    parser.add_argument('--model', type=str, default='cnn_3l', choices=['wrn','cnn_3l', 'cnn_3l_bn', 'dn', 'lenet5'])
-    parser.add_argument('--conv_expand', type=int, default=1)
-    parser.add_argument('--fc_expand', type=int, default=1)
-    parser.add_argument('--depth', type=int, default=28)
-    parser.add_argument('--width', type=int, default=10)
-    parser.add_argument('--trial_num', type=int, default=None)
-
-    # Training args
-    parser.add_argument('--batch_size', type=int, default=128) 
-    parser.add_argument('--test_batch_size', type=int, default=128)
-    parser.add_argument('--train_epochs', type=int, default=20)
-    parser.add_argument('--learning_rate', type=float, default=0.1)
-    parser.add_argument('--lr_schedule', type=str, default='linear0')
-    parser.add_argument('--weight_decay', type=float, default=2e-4)
-
-    # Attack args
-    parser.add_argument('--is_adv', dest='is_adv', action='store_true')
-    parser.add_argument('--attack', type=str, default='PGD_l2')
-    parser.add_argument('--epsilon', type=float, default=3.0)
-    parser.add_argument('--attack_iter', type=int, default=10)
-    parser.add_argument('--eps_step', type=float, default=0.3)
-    parser.add_argument('--targeted', dest='targeted', action='store_true')
-    parser.add_argument('--clip_min', type=float, default=0)
-    parser.add_argument('--clip_max', type=float, default=1.0)
-    parser.add_argument('--rand_init', dest='rand_init', action='store_true')
-    parser.add_argument('--eps_schedule', type=int, default=0)
-    parser.add_argument('--num_restarts', type=int, default=1)
-
-    # IO args
-    parser.add_argument('--last_epoch', type=int, default=0)
-    parser.add_argument('--curr_epoch', type=int, default=0)
-    parser.add_argument('--save_checkpoint', dest='save_checkpoint', action='store_true')
-    parser.add_argument('--load_checkpoint', dest='load_checkpoint', action='store_true')
-    parser.add_argument('--checkpoint_path', type=str, default='trained_models')
-
-    # Matching args
-    parser.add_argument('--track_hard', dest='track_hard', action='store_true')
-    parser.add_argument('--is_dropping', dest='dropping', action='store_true')
-    parser.add_argument('--dropping_strat', type=str, default='matched')
-    parser.add_argument('--matching_path', type=str, default='matchings')
-    parser.add_argument('--degree_path', type=str, default='graph_data/degree_results')
-    parser.add_argument("--norm", default='l2', help="norm to be used")
-    parser.add_argument('--drop_thresh', type=int, default=100)
-    
-    args = parser.parse_args()
-    if args.num_samples is None:
-        args.num_samples = 'All'
-
-    if 'hybrid' in args.attack:
-        args.track_hard = True
-
-    attack_params = {'attack': args.attack, 'epsilon': args.epsilon, 
-                     'attack_iter': args.attack_iter, 'eps_step': args.eps_step,
-                     'targeted': args.targeted, 'clip_min': args.clip_min,
-                     'clip_max': args.clip_max,'rand_init': args.rand_init, 
-                     'num_restarts': args.num_restarts}
-
+def main(trial_num):
+    args.trial_num = trial_num
     model_dir_name, log_dir_name, figure_dir_name, training_output_dir_name = init_dirs(args, train=True)
     if args.save_checkpoint:
         writer = SummaryWriter(log_dir=log_dir_name)
@@ -98,14 +34,15 @@ if __name__ == '__main__':
         print('CUDA enabled')
     else:
         raise ValueError('Needs a working GPU!')
+
+    training_time = True
     
     if args.n_classes != 10:
-        loader_train, loader_test, data_details = load_dataset_custom(args, data_dir='data')
+        loader_train, loader_test, data_details = load_dataset_custom(args, data_dir='data', training_time=training_time)
         args.dropping = False
-        # args.track_hard = True
-        loader_train_all, _, _ = load_dataset_custom(args, data_dir='data')
+        loader_train_all, _, _ = load_dataset_custom(args, data_dir='data', training_time=training_time)
     else:
-        loader_train, loader_test, data_details = load_dataset(args, data_dir='data')
+        loader_train, loader_test, data_details = load_dataset(args, data_dir='data', training_time=training_time)
 
     num_channels = data_details['n_channels']
 
@@ -208,3 +145,73 @@ if __name__ == '__main__':
                 writer.add_scalar('Loss/train_ben', 0, epoch)
         print('Train loss - Adv: %s Ben: %s; Test loss - Adv: %s; Ben: %s' %
             (train_loss_adv, train_loss, test_loss_adv, test_loss))
+
+
+if __name__ == '__main__':
+    torch.random.manual_seed(7)
+    parser = argparse.ArgumentParser()
+    
+    # Data args
+    parser.add_argument('--dataset_in', type=str, default='MNIST')
+    parser.add_argument('--n_classes', type=int, default=2)
+    parser.add_argument('--num_samples', type=int, default=4000)
+
+    # Model args
+    parser.add_argument('--model', type=str, default='cnn_3l', choices=['wrn','cnn_3l', 'cnn_3l_bn', 'dn', 'lenet5'])
+    parser.add_argument('--conv_expand', type=int, default=1)
+    parser.add_argument('--fc_expand', type=int, default=1)
+    parser.add_argument('--depth', type=int, default=28)
+    parser.add_argument('--width', type=int, default=10)
+    parser.add_argument('--num_of_trials', type=int, default=1)
+
+    # Training args
+    parser.add_argument('--batch_size', type=int, default=128) 
+    parser.add_argument('--test_batch_size', type=int, default=128)
+    parser.add_argument('--train_epochs', type=int, default=20)
+    parser.add_argument('--learning_rate', type=float, default=0.1)
+    parser.add_argument('--lr_schedule', type=str, default='linear0')
+    parser.add_argument('--weight_decay', type=float, default=2e-4)
+
+    # Attack args
+    parser.add_argument('--is_adv', dest='is_adv', action='store_true')
+    parser.add_argument('--attack', type=str, default='PGD_l2')
+    parser.add_argument('--epsilon', type=float, default=3.0)
+    parser.add_argument('--attack_iter', type=int, default=10)
+    parser.add_argument('--gamma', type=float, default=1.0)
+    parser.add_argument('--targeted', dest='targeted', action='store_true')
+    parser.add_argument('--clip_min', type=float, default=0)
+    parser.add_argument('--clip_max', type=float, default=1.0)
+    parser.add_argument('--rand_init', dest='rand_init', action='store_true')
+    parser.add_argument('--eps_schedule', type=int, default=0)
+    parser.add_argument('--num_restarts', type=int, default=1)
+
+    # IO args
+    parser.add_argument('--last_epoch', type=int, default=0)
+    parser.add_argument('--curr_epoch', type=int, default=0)
+    parser.add_argument('--save_checkpoint', dest='save_checkpoint', action='store_true')
+    parser.add_argument('--load_checkpoint', dest='load_checkpoint', action='store_true')
+    parser.add_argument('--checkpoint_path', type=str, default='trained_models')
+
+    # Matching args
+    parser.add_argument('--track_hard', dest='track_hard', action='store_true')
+    parser.add_argument('--is_dropping', dest='dropping', action='store_true')
+    parser.add_argument('--marking_strat', type=str, default=None)
+    parser.add_argument('--matching_path', type=str, default='matchings')
+    parser.add_argument('--degree_path', type=str, default='graph_data/degree_results')
+    parser.add_argument("--norm", default='l2', help="norm to be used")
+    parser.add_argument('--drop_thresh', type=int, default=100)
+    
+    args = parser.parse_args()
+    if args.num_samples is None:
+        args.num_samples = 'All'
+
+    args.eps_step = args.epsilon*args.gamma/args.attack_iter
+    attack_params = {'attack': args.attack, 'epsilon': args.epsilon, 
+                     'attack_iter': args.attack_iter, 'eps_step': args.eps_step,
+                     'targeted': args.targeted, 'clip_min': args.clip_min,
+                     'clip_max': args.clip_max,'rand_init': args.rand_init, 
+                     'num_restarts': args.num_restarts}
+
+    # Running trials 
+    for idx in range(args.num_of_trials):
+        main(idx+1)

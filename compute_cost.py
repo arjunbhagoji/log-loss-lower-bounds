@@ -142,10 +142,12 @@ parser.add_argument('--eps', type=float, default=None)
 parser.add_argument('--approx_only', dest='approx_only', action='store_true')
 parser.add_argument('--use_test', dest='use_test', action='store_true')
 parser.add_argument('--track_hard', dest='track_hard', action='store_true')
+parser.add_argument('--new_marking_strat', type=str, default=None)
 
 args = parser.parse_args()
 
-train_data, test_data, data_details = load_dataset_numpy(args, data_dir='data')
+train_data, test_data, data_details = load_dataset_numpy(args, data_dir='data',
+														training_time=False)
 DATA_DIM = data_details['n_channels']*data_details['h_in']*data_details['w_in']
 
 X = []
@@ -241,8 +243,8 @@ for eps in eps_list:
 
 	# Decide if matching is to be carried out
 	if not args.approx_only:
-		curr_file_name = 'matchings/' + save_file_name + '_{0:.1f}.npy'.format(eps)
-		curr_file_name_c0 = 'matchings/' + save_file_name_c0 + '_{0:.1f}.npy'.format(eps)
+		curr_file_name = 'matchings/' + args.dataset_in + '/' + save_file_name + '_{0:.1f}.npy'.format(eps)
+		curr_file_name_c0 = 'matchings/' + args.dataset_in + '/' + save_file_name_c0 + '_{0:.1f}.npy'.format(eps)
 		if os.path.exists(curr_file_name):
 			print('Loading computed matching')
 			output = np.load(curr_file_name)
