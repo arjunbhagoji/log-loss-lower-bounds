@@ -69,9 +69,9 @@ class MNIST(VisionDataset):
         self.np_array = np_array
 
         if training_time:
-            marking_strat = args.marking_strat
+            self.marking_strat = args.marking_strat
         else:
-            marking_strat = args.new_marking_strat
+            self.marking_strat = args.new_marking_strat
 
         if download:
             self.download()
@@ -96,25 +96,25 @@ class MNIST(VisionDataset):
         self.matched_idx = -1*np.ones(2*num_samples)
 
         # Tracking paired points
-        if marking_strat is not None:
-            print('Using %s to mark' % marking_strat)
-            if marking_strat == 'matched':
+        if self.marking_strat is not None:
+            print('Using %s to mark' % self.marking_strat)
+            if self.marking_strat == 'matched':
                 mask_matched = self._matching_filter(args, num_samples)
-            elif marking_strat == 'approx':
+            elif self.marking_strat == 'approx':
                 print('Using approx filtering')
                 mask_matched = self._degree_filter(args, num_samples)
-            elif marking_strat == 'random':
+            elif self.marking_strat == 'random':
                 print('Dropping random points')
                 mask_matched = self._random_filter(args, num_samples)
-            elif marking_strat == 'distance':
+            elif self.marking_strat == 'distance':
                 # Only used at test time
                 mask_matched = self._distance_filter(args, num_samples)
-            elif marking_strat == 'matched_future':
+            elif 'matched_future' in self.marking_strat:
                 mask_matched = self._matching_future_filter(args, num_samples)
         # print('No. of samples in use: {}'.format(len(self.data)))
         # Checking if points need to be dropped  
         if self.dropping and self.training_time:
-            if marking_strat == 'distance':
+            if self.marking_strat == 'distance':
                 raise ValueError('Distance-based marking cannot be used at train time')
             print('Filtering training data')
             curr_data = self.data[mask_matched]
@@ -158,11 +158,10 @@ class MNIST(VisionDataset):
         return curr_data, curr_labels, num_samples
 
     def _matching_filter(self, args, num_samples):
-        print('Marking using matching')
         class_1 = 3
         class_2 = 7
         mask_matched = np.ones(2*num_samples,dtype=bool)
-        print(matching_file_name(args,class_1,class_2, self.train, num_samples))
+        # print(matching_file_name(args,class_1,class_2, self.train, num_samples))
         if os.path.exists(matching_file_name(args,class_1,class_2, self.train, num_samples)):
             output = np.load(matching_file_name(args, class_1, class_2, self.train, num_samples))
         else:
@@ -191,7 +190,7 @@ class MNIST(VisionDataset):
         class_1 = 3
         class_2 = 7
         mask_matched = np.ones(2*num_samples,dtype=bool)
-        print(global_matching_file_name(args,class_1,class_2, self.train, num_samples))
+        # print(global_matching_file_name(args,class_1,class_2, self.train, num_samples))
         match_dict_name, match_tuple_name = global_matching_file_name(args,class_1,class_2, self.train, num_samples)
         if os.path.exists(match_tuple_name):
             output = np.load(match_tuple_name)
@@ -199,24 +198,33 @@ class MNIST(VisionDataset):
                 output_dict = json.load(f)
         else:
             raise ValueError('No future matching computed')
-        num_matched = len(output[0])
-        print('Marking %s using future matching' % num_matched)
+        if 'replace' in self.marking_strat:
+            if os.path.exists(matching_file_name(args,class_1,class_2, self.train, num_samples)):
+                output_local = np.load(matching_file_name(args, class_1, class_2, self.train, num_samples))
+            else:
+                raise ValueError('No matching computed')
+        num_matched = len(output_dict)
+        # print('Marking %s using future matching' % num_matched)
         if num_matched == 0:
             print('No matching')
             # return self.data, self.targets
         else:
             # Dropping at random
-            for i in range(num_matched):
-                coin = np.random.random_sample()
-                if coin < 0.5:
-                    mask_matched[output[0][i]] = False
-                else:
-                    mask_matched[num_samples+output[1][i]] = False
-                # Marking hard samples
-                self.easy_idx[output[0][i]] = False
-                self.easy_idx[num_samples+output[1][i]] = False
-                self.matched_idx[output[0][i]] = num_samples+output[1][i]
-                self.matched_idx[num_samples+output[1][i]] = output[0][i]
+            for k in output_dict:
+                self.easy_idx[int(k)] = False
+                self.matched_idx[int(k)] = int(output_dict[k][0])
+                if 'replace' in self.marking_strat:
+                    if int(k) < num_samples:
+                        if int(k) in output_local[0]:
+                            i = list(output_local[0]).index(int(k))
+                            self.matched_idx[int(k)] = num_samples+output_local[1][i]
+                            # print('%s to %s replaced at curr eps' % (int(k), num_samples+output_local[1][i]))
+                    elif int(k) >= num_samples:
+                        mod_k = int(k) - num_samples
+                        if mod_k in output_local[1]:
+                            i = list(output_local[1]).index(mod_k)
+                            self.matched_idx[int(k)] = output_local[0][i]
+                            # print('%s to %s replaced at curr eps' % (int(k), output_local[0][i]))
 
             return mask_matched
 
@@ -271,14 +279,14 @@ class MNIST(VisionDataset):
         for i in range(2*num_samples):
             if i<num_samples:
                 row_idx = i
-                curr_dists = dist_mat[i,:]
-                closest_idx = np.argmax(curr_dists)
+                curr_dists = dist_mat[row_idx,:]
+                closest_idx = np.argmin(curr_dists)
                 self.matched_idx[i] = num_samples+closest_idx
                 self.easy_idx[i] = False
             else:
                 col_idx = i % num_samples
                 curr_dists = dist_mat[:,col_idx]
-                closest_idx = np.argmax(curr_dists)
+                closest_idx = np.argmin(curr_dists)
                 self.matched_idx[i] = closest_idx
                 self.easy_idx[i] = False
 

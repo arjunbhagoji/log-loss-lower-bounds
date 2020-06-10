@@ -17,14 +17,15 @@ from torch.utils.tensorboard import SummaryWriter
 from utils.mnist_models import cnn_3l, cnn_3l_bn, lenet5
 from utils.cifar10_models import WideResNet
 from utils.densenet_model import DenseNet
-from utils.train_utils import train_one_epoch, robust_train_one_epoch, update_hyparam, eps_scheduler
+from utils.train_utils import train_one_epoch, robust_train_one_epoch, eps_scheduler
 from utils.test_utils import test, robust_test, robust_test_hybrid
 from utils.data_utils import load_dataset, load_dataset_custom
 from utils.io_utils import init_dirs
-
+from utils.curriculum_utils import *
 
 def main(trial_num):
     args.trial_num = trial_num
+    print(args.curriculum)
     model_dir_name, log_dir_name, figure_dir_name, training_output_dir_name = init_dirs(args, train=True)
     if args.save_checkpoint:
         writer = SummaryWriter(log_dir=log_dir_name)
@@ -98,13 +99,33 @@ def main(trial_num):
                                 lr=args.learning_rate,
                                 momentum=0.9,
                                 weight_decay=args.weight_decay)
-    
+
+    if args.lr_schedule == 'cosine':
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,
+                T_max=args.train_epochs, eta_min=0, last_epoch=-1)
+    elif args.lr_schedule == 'linear0':
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100,150,200], gamma=0.1)
+
+    if args.curriculum != 'all':
+        args.num_sets = int(args.curriculum[-1])
+        print(args.num_sets)
+        loader_list = curriculum_setter(args,'data')
+        curriculum_step = 0
+
+    early_stop_counter = 0
+    # early_stop_thresh = 0.05
+    best_loss_adv = 100.0
+
     for epoch in range(args.curr_epoch, args.train_epochs):
         start_time = time.time()
-        lr = update_hyparam(epoch, args)
-        optimizer.param_groups[0]['lr'] = lr
+        # lr = update_hyparam(epoch, args)
+        lr = optimizer.param_groups[0]['lr']
         print('Current learning rate: {}'.format(lr))
         eps, delta = eps_scheduler(epoch, args)
+        if args.curriculum != 'all' and curriculum_step+1<args.num_sets:
+            print('C step: %s; Stop counter: %s' % (curriculum_step, early_stop_counter))
+            curriculum_step, early_stop_counter = curriculum_checker(args, epoch, curriculum_step, early_stop_counter)
+            loader_train = loader_list[curriculum_step]
         if not args.is_adv:
             curr_loss = train_one_epoch(net, criterion, optimizer, 
                                   loader_train, args, verbose=False)
@@ -130,9 +151,21 @@ def main(trial_num):
         acc_train, acc_adv_train, train_loss, train_loss_adv = f_eval(net, 
             criterion, loader_train_all, args, attack_params, epoch, training_output_dir_name, 
             None, n_batches=n_batches_eval, train_data=True, training_time=True)
-        ckpt_path = 'checkpoint_' + str(args.last_epoch)
+        # if epoch>0:
+        #     train_loss_diff = abs(train_loss_adv-train_loss_adv_prev)
+        #     print('Train loss difference: %s' % train_loss_diff)
+        #     if train_loss_diff<early_stop_thresh:
+        #         early_stop_counter += 1
+        #     else:
+        #         early_stop_counter = 0
+        # train_loss_adv_prev = train_loss_adv
         if args.save_checkpoint:
+            ckpt_path = 'checkpoint_' + str(args.last_epoch)
             torch.save(net.state_dict(), model_dir_name + ckpt_path)
+            if train_loss_adv<best_loss_adv and epoch>0:
+                ckpt_path_best = 'checkpoint_' + str(epoch)
+                torch.save(net.state_dict(), model_dir_name + ckpt_path_best)
+                best_loss_adv = train_loss_adv
             writer.add_scalar('Loss/train', train_loss_adv, epoch)
             writer.add_scalar('Loss/test', test_loss, epoch)
             writer.add_scalar('Loss/test_adv', test_loss_adv, epoch)
@@ -145,10 +178,14 @@ def main(trial_num):
                 writer.add_scalar('Loss/train_ben', 0, epoch)
         print('Train loss - Adv: %s Ben: %s; Test loss - Adv: %s; Ben: %s' %
             (train_loss_adv, train_loss, test_loss_adv, test_loss))
+        scheduler.step()
 
 
 if __name__ == '__main__':
     torch.random.manual_seed(7)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(7)
     parser = argparse.ArgumentParser()
     
     # Data args
@@ -171,6 +208,7 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', type=float, default=0.1)
     parser.add_argument('--lr_schedule', type=str, default='linear0')
     parser.add_argument('--weight_decay', type=float, default=2e-4)
+    parser.add_argument('--curriculum', type=str, default='all')
 
     # Attack args
     parser.add_argument('--is_adv', dest='is_adv', action='store_true')

@@ -97,7 +97,7 @@ def make_grid(tensor, nrow=8, padding=2,
             k = k + 1
     return grid, height, width, padding
 
-def plot_image_grid(grid, height, width, padding, preds_adv, y, file_name=None, dpi=224):
+def plot_image_grid(grid, height, width, padding, preds_adv=None, y=None, file_name=None, dpi=224, index=None):
     grid_shape = grid.shape
     # n_rows = len(grid)
     # n_cols = len(grid[0])
@@ -121,16 +121,28 @@ def plot_image_grid(grid, height, width, padding, preds_adv, y, file_name=None, 
             ax.set_xticks([])
             ax.set_yticks([])
 
-            curr_label = 'Pred:' + class_labels[preds_adv[count]] + '; True:' + class_labels[y[count]]
+            if preds_adv is not None:
+                curr_label = 'Pred:' + class_labels[preds_adv[count]] + '; True:' + class_labels[y[count]]
 
-            # if not r: #column labels
-            # if col_labels != []:
-            ax.set_title(curr_label,
-                         rotation=0.0,
-                         horizontalalignment='left',
-                         verticalalignment='bottom',
-                         fontsize=8
-                         )
+                # if not r: #column labels
+                # if col_labels != []:
+                ax.set_title(curr_label,
+                             rotation=0.0,
+                             horizontalalignment='left',
+                             verticalalignment='bottom',
+                             fontsize=8
+                             )
+
+            if index is not None:
+                if count < len(index):
+                    curr_label = index[count]
+                    ax.set_ylabel(curr_label,
+                                 rotation=0.0,
+                                 horizontalalignment='left',
+                                 verticalalignment='bottom',
+                                 fontsize=8
+                                 )
+
             count += 1
                             
                     # print('skip')
@@ -178,3 +190,28 @@ def custom_save_image(adv_x, preds_adv, y, args, figure_dir_name, train_data):
 	y = y.cpu().numpy()
 
 	plot_image_grid(numpy_grid, height, width, padding, preds_adv, y, file_name=file_name, dpi=224)
+
+def save_image_simple(x, args, figure_dir_name, train_data=None, hard=None, indices=None):
+    file_name = '{}/train_first.jpg'.format(figure_dir_name)
+
+    # if train_data:
+    #     if hard:
+    #         file_name = '{}/train_hard_{}_{}_{}.jpg'.format(figure_dir_name, args.new_epsilon, 
+    #                         args.new_attack_iter, args.new_eps_step)
+    #     else:
+    #         file_name = '{}/train_easy_{}_{}_{}.jpg'.format(figure_dir_name, args.new_epsilon, 
+    #                         args.new_attack_iter, args.new_eps_step)
+    # else:
+    #     if hard:
+    #         file_name = '{}/test_hard_{}_{}_{}.jpg'.format(figure_dir_name, args.new_epsilon, 
+    #                         args.new_attack_iter, args.new_eps_step)
+    #     else:
+    #         file_name = '{}/test_easy_{}_{}_{}.jpg'.format(figure_dir_name, args.new_epsilon, 
+    #                         args.new_attack_iter, args.new_eps_step)
+
+    torch_grid, height, width, padding = make_grid(x)
+    numpy_grid = torch_grid.mul(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).to(
+                    'cpu', torch.uint8).numpy()
+    print(numpy_grid.shape)
+    
+    plot_image_grid(numpy_grid, height, width, padding, file_name=file_name, dpi=224, index=indices)

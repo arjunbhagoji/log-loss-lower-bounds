@@ -57,12 +57,19 @@ class cifar10(VisionDataset):
     }
 
     def __init__(self, root, args, train=True, transform=None, target_transform=None,
-                 download=False, num_samples=None, dropping=False):
+                 download=False, np_array=False, dropping=False, training_time=False):
 
         super(cifar10, self).__init__(root, transform=transform,
                                       target_transform=target_transform)
 
+        self.training_time = training_time
         self.train = train  # training set or test set
+        self.np_array = np_array
+
+        if training_time:
+            marking_strat = args.marking_strat
+        else:
+            marking_strat = args.new_marking_strat
 
         if download:
             self.download()
@@ -96,11 +103,48 @@ class cifar10(VisionDataset):
         self.data = np.vstack(self.data).reshape(-1, 3, 32, 32)
         self.data = self.data.transpose((0, 2, 3, 1))  # convert to HWC
 
-        self.data, self.targets = self._two_c_filter(num_samples)
-
         self._load_meta()
 
-    def _two_c_filter(self,num_samples):
+        self.data, self.targets, num_samples = self._two_c_filter(args)
+
+        self.dropping = dropping
+
+        self.easy_idx = np.ones(2*num_samples,dtype=bool)
+
+        self.matched_idx = -1*np.ones(2*num_samples)
+
+        # Tracking paired points
+        if marking_strat is not None:
+            print('Using %s to mark' % marking_strat)
+            if marking_strat == 'matched':
+                mask_matched = self._matching_filter(args, num_samples)
+            elif marking_strat == 'approx':
+                print('Using approx filtering')
+                mask_matched = self._degree_filter(args, num_samples)
+            elif marking_strat == 'random':
+                print('Dropping random points')
+                mask_matched = self._random_filter(args, num_samples)
+            elif marking_strat == 'distance':
+                # Only used at test time
+                mask_matched = self._distance_filter(args, num_samples)
+            elif marking_strat == 'matched_future':
+                mask_matched = self._matching_future_filter(args, num_samples)
+        # print('No. of samples in use: {}'.format(len(self.data)))
+        
+        # Checking if points need to be dropped  
+        if self.dropping and self.training_time:
+            if marking_strat == 'distance':
+                raise ValueError('Distance-based marking cannot be used at train time')
+            print('Filtering training data')
+            curr_data = self.data[mask_matched]
+            curr_labels = np.array(self.targets)
+            curr_labels = curr_labels[mask_matched]
+            self.easy_idx = self.easy_idx[mask_matched]
+            print('Length of data after dropping:{}'.format(len(curr_data)))    
+            self.data = curr_data
+            self.targets = curr_labels
+
+    def _two_c_filter(self, args):
         class_1 = 3
         class_2 = 7
         targets_arr = np.array(self.targets)
@@ -110,11 +154,17 @@ class cifar10(VisionDataset):
         X_c1 = self.data[c1_idx]
         X_c2 = self.data[c2_idx]
 
-        if num_samples is not None:
+        num_samples = args.num_samples
+        if len(X_c1) < args.num_samples or len(X_c2) < args.num_samples:
+            num_samples = min(len(X_c1),len(X_c2))
+            # print('Culling number of samples to {}'.format(num_samples))
+
+        if args.num_samples is not None:
             X_c1 = X_c1[:num_samples]
             X_c2 = X_c2[:num_samples]
 
         curr_data = np.vstack((X_c1,X_c2))
+        # curr_data = X_c1.extend(X_c2)
 
         Y_curr = np.zeros(len(curr_data))
         Y_curr[0:len(X_c1)] = 0
@@ -122,8 +172,8 @@ class cifar10(VisionDataset):
 
         curr_labels = Y_curr.tolist()
         curr_labels = [int(x) for x in curr_labels]
-
-        return curr_data, curr_labels
+        
+        return curr_data, curr_labels, num_samples
 
     def _load_meta(self):
         path = os.path.join(self.root, self.base_folder, self.meta['filename'])
@@ -138,6 +188,8 @@ class cifar10(VisionDataset):
             self.classes = data[self.meta['key']]
         self.class_to_idx = {_class: i for i, _class in enumerate(self.classes)}
 
+    #To-do: add filtering here
+
     def __getitem__(self, index):
         """
         Args:
@@ -148,9 +200,14 @@ class cifar10(VisionDataset):
         """
         img, target = self.data[index], self.targets[index]
 
+        easy_indc = self.easy_idx[index]
+
+        matched_idx_curr = int(self.matched_idx[index])
+
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
-        img = Image.fromarray(img)
+        if not self.np_array:
+            img = Image.fromarray(img)
 
         if self.transform is not None:
             img = self.transform(img)
@@ -158,8 +215,7 @@ class cifar10(VisionDataset):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        return img, target
-
+        return img, target, index, easy_indc, matched_idx_curr
 
     def __len__(self):
         return len(self.data)
@@ -182,59 +238,59 @@ class cifar10(VisionDataset):
     def extra_repr(self):
         return "Split: {}".format("Train" if self.train is True else "Test")
 
-    def _load_meta(self):
-        path = os.path.join(self.root, self.base_folder, self.meta['filename'])
-        if not check_integrity(path, self.meta['md5']):
-            raise RuntimeError('Dataset metadata file not found or corrupted.' +
-                               ' You can use download=True to download it')
-        with open(path, 'rb') as infile:
-            if sys.version_info[0] == 2:
-                data = pickle.load(infile)
-            else:
-                data = pickle.load(infile, encoding='latin1')
-            self.classes = data[self.meta['key']]
-        self.class_to_idx = {_class: i for i, _class in enumerate(self.classes)}
+    # def _load_meta(self):
+    #     path = os.path.join(self.root, self.base_folder, self.meta['filename'])
+    #     if not check_integrity(path, self.meta['md5']):
+    #         raise RuntimeError('Dataset metadata file not found or corrupted.' +
+    #                            ' You can use download=True to download it')
+    #     with open(path, 'rb') as infile:
+    #         if sys.version_info[0] == 2:
+    #             data = pickle.load(infile)
+    #         else:
+    #             data = pickle.load(infile, encoding='latin1')
+    #         self.classes = data[self.meta['key']]
+    #     self.class_to_idx = {_class: i for i, _class in enumerate(self.classes)}
 
-    def __getitem__(self, index):
-        """
-        Args:
-            index (int): Index
+    # def __getitem__(self, index):
+    #     """
+    #     Args:
+    #         index (int): Index
 
-        Returns:
-            tuple: (image, target) where target is index of the target class.
-        """
-        img, target = self.data[index], self.targets[index]
+    #     Returns:
+    #         tuple: (image, target) where target is index of the target class.
+    #     """
+    #     img, target = self.data[index], self.targets[index]
 
-        # doing this so that it is consistent with all other datasets
-        # to return a PIL Image
-        img = Image.fromarray(img)
+    #     # doing this so that it is consistent with all other datasets
+    #     # to return a PIL Image
+    #     img = Image.fromarray(img)
 
-        if self.transform is not None:
-            img = self.transform(img)
+    #     if self.transform is not None:
+    #         img = self.transform(img)
 
-        if self.target_transform is not None:
-            target = self.target_transform(target)
+    #     if self.target_transform is not None:
+    #         target = self.target_transform(target)
 
-        return img, target
+    #     return img, target
 
 
-    def __len__(self):
-        return len(self.data)
+    # def __len__(self):
+    #     return len(self.data)
 
-    def _check_integrity(self):
-        root = self.root
-        for fentry in (self.train_list + self.test_list):
-            filename, md5 = fentry[0], fentry[1]
-            fpath = os.path.join(root, self.base_folder, filename)
-            if not check_integrity(fpath, md5):
-                return False
-        return True
+    # def _check_integrity(self):
+    #     root = self.root
+    #     for fentry in (self.train_list + self.test_list):
+    #         filename, md5 = fentry[0], fentry[1]
+    #         fpath = os.path.join(root, self.base_folder, filename)
+    #         if not check_integrity(fpath, md5):
+    #             return False
+    #     return True
 
-    def download(self):
-        if self._check_integrity():
-            print('Files already downloaded and verified')
-            return
-        download_and_extract_archive(self.url, self.root, filename=self.filename, md5=self.tgz_md5)
+    # def download(self):
+    #     if self._check_integrity():
+    #         print('Files already downloaded and verified')
+    #         return
+    #     download_and_extract_archive(self.url, self.root, filename=self.filename, md5=self.tgz_md5)
 
-    def extra_repr(self):
-        return "Split: {}".format("Train" if self.train is True else "Test")
+    # def extra_repr(self):
+    #     return "Split: {}".format("Train" if self.train is True else "Test")

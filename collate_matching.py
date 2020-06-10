@@ -5,6 +5,7 @@ import os
 
 from utils.data_utils import load_dataset_numpy
 from utils.io_utils import matching_file_name, global_matching_file_name
+from collections import OrderedDict
 
 
 parser = argparse.ArgumentParser()
@@ -33,7 +34,7 @@ else:
 	train_data = True
 	num_samples = int(len(X_tr)/2)
 
-match_dict = {}
+match_dict = OrderedDict()
 class_1_indices = []
 class_2_indices = []
 
@@ -48,6 +49,8 @@ if args.dataset_in == 'MNIST':
 elif args.dataset_in == 'fMNIST':
 	eps_list = np.linspace(2.2,6.0,20)
 
+num_added = 0
+
 for eps in eps_list:
 	args.epsilon = eps
 	print(matching_file_name(args,class_1,class_2,train_data,num_samples))
@@ -61,17 +64,25 @@ for eps in eps_list:
 		for i in range(num_matched):
 			class_1_idx = output[0][i]
 			class_2_idx = output[1][i]
-			if class_1_idx in class_1_indices:
-				# print('Skipping %s and %s' % (class_1_idx, class_2_idx))
-				continue
-			else:
-				match_dict[str(class_1_idx)] = [str(class_2_idx+num_samples), str(eps)]
-				match_dict[str(class_2_idx+num_samples)] = [str(class_1_idx), str(eps)]
+			# print(class_1_idx, class_2_idx)
+			if str(class_1_idx) not in match_dict:
+				num_added += 1
+				match_dict[str(class_1_idx)] = [str(class_2_idx+num_samples), eps]
 				class_1_indices.append(class_1_idx)
 				class_2_indices.append(class_2_idx)
+			if str(class_2_idx+num_samples) not in match_dict:
+				num_added += 1
+				c2_idx = class_2_idx+num_samples
+				match_dict[str(c2_idx)] = [str(class_1_idx), eps]
+				class_1_indices.append(class_1_idx)
+				class_2_indices.append(class_2_idx)
+			else:
+				continue
 
 matched_tuple = (class_1_indices, class_2_indices)
+print(len(match_dict.keys()))
 print(len(class_1_indices))
+print(num_added)
 np.save(global_tuple_name,matched_tuple)
 
 with open(global_dict_name, 'w') as f:

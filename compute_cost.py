@@ -153,6 +153,7 @@ DATA_DIM = data_details['n_channels']*data_details['h_in']*data_details['w_in']
 X = []
 Y = []
 
+# Pytorch normalizes tensors (so need manual here!)
 if args.use_test:
 	for (x,y,_, _, _) in test_data:
 		X.append(x/255.)
@@ -193,11 +194,11 @@ if args.norm == 'l2' and 'MNIST' in args.dataset_in:
 	# eps_list = np.linspace(3.2,3.8,4)
 	eps_list = np.linspace(4.0,5.0,2)
 	# eps_list=[2.6,2.8]
-elif args.norm == 'l2' and 'CIFAR-10' in args.dataset:
+elif args.norm == 'l2' and 'CIFAR-10' in args.dataset_in:
 	eps_list = np.linspace(4.0,10.0,13)
-elif args.norm == 'linf' and 'MNIST' in args.dataset:
+elif args.norm == 'linf' and 'MNIST' in args.dataset_in:
 	eps_list = np.linspace(0.1,0.5,5)
-elif args.norm == 'linf' and 'CIFAR-10' in args.dataset:
+elif args.norm == 'linf' and 'CIFAR-10' in args.dataset_in:
 	eps_list = np.linspace(0.1,0.5,5)
 
 if args.eps is not None:

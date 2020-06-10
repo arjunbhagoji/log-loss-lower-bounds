@@ -18,7 +18,7 @@ from utils.cifar10_models import WideResNet
 from utils.densenet_model import DenseNet
 from utils.test_utils import test, robust_test, robust_test_hybrid
 from utils.data_utils import load_dataset, load_dataset_custom
-from utils.io_utils import init_dirs, model_naming, test_file_save_name
+from utils.io_utils import init_dirs, model_naming, test_file_save_name, test_probs_save_name
 
 
 def main(trial_num):
@@ -88,21 +88,35 @@ def main(trial_num):
     n_batches_eval = 0
     print('Training data results')
     # test(net, loader_train, figure_dir_name)
-    acc_train, acc_train_adv, _, _ = f_eval(net, 
+    acc_train, acc_train_adv, loss_train, loss_train_adv, prob_dict_train = f_eval(net, 
         criterion, loader_train, args, attack_params, 0, None, 
         figure_dir_name, n_batches=n_batches_eval, train_data=True, training_time=training_time)
     print('Test data results')
     # test(net, loader_test, figure_dir_name)
-    acc_test, acc_test_adv, _, _ = f_eval(net, 
+    acc_test, acc_test_adv, loss_test, loss_test_adv, prob_dict_test = f_eval(net, 
         criterion, loader_test, args, attack_params, 0, None, 
         figure_dir_name, n_batches=n_batches_eval, train_data=False, training_time=training_time)
 
+    all_probs_train=np.zeros((len(prob_dict_train),2))
+    for k in range(len(prob_dict_train)):
+        all_probs_train[k]=prob_dict_train[str(k)]
+
+    all_probs_test=np.zeros((len(prob_dict_test),2))
+    for k in range(len(prob_dict_test)):
+        all_probs_test[k]=prob_dict_test[str(k)]
+
+    # printing out loss
+    print('Train loss adv:%s' % loss_train_adv)
     # Saving test output
     test_output_fname = test_file_save_name(args, model_name)
     acc_train_list.append(acc_train)
     acc_train_adv_list.append(acc_train_adv)
     acc_test_list.append(acc_test)
     acc_test_adv_list.append(acc_test_adv)
+
+    probs_output_fname = test_probs_save_name(args,model_name)
+    np.savetxt(probs_output_fname + '_train.txt',all_probs_train, fmt='%.5f')
+    np.savetxt(probs_output_fname + '_test.txt',all_probs_test, fmt='%.5f')
 
     if args.save_test:
         f = open(test_output_fname, mode='a')
@@ -155,6 +169,7 @@ if __name__ == '__main__':
     parser.add_argument('--degree_path', type=str, default='graph_data/degree_results')
     parser.add_argument("--norm", default='l2', help="norm to be used")
     parser.add_argument('--drop_thresh', type=int, default=100)
+    parser.add_argument('--curriculum', type=str, default='all')
 
     # Attack args
     parser.add_argument('--new_attack', type=str, default='PGD_l2',

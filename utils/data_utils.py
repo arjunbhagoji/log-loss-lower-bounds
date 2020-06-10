@@ -138,11 +138,7 @@ def load_cifar_dataset_custom(args, data_dir, training_time):
     # CIFAR-10 data loaders
     trainset = cifar10(root=data_dir, args=args, train=True,
                                 download=False, 
-                                transform=transforms.Compose([
-                                    transforms.RandomHorizontalFlip(),
-                                    transforms.RandomCrop(32, 4),
-                                    transforms.ToTensor()
-                                ]),
+                                transform=transforms.ToTensor(),
                                 dropping=args.dropping,
                                 training_time=training_time)
     loader_train = torch.utils.data.DataLoader(trainset, 
@@ -186,14 +182,11 @@ def load_dataset_numpy(args, data_dir, training_time):
     elif args.dataset_in == 'CIFAR-10':
         trainset = cifar10(root=data_dir, args=args, train=True,
                             download=False, 
-                            transform=transforms.Compose([
-                                transforms.RandomHorizontalFlip(),
-                                transforms.RandomCrop(32, 4),
-                            ]),
+                            np_array=True,
                             training_time=training_time)
-        testset = cifar10(root=data_dir, args=args,
-                                train=False,
+        testset = cifar10(root=data_dir, args=args, train=False,
                                 download=False,
+                                np_array=True,
                                 training_time=training_time)
         data_details = {'n_channels':3, 'h_in':32, 'w_in':32, 'scale':255.0}
     return trainset, testset, data_details
@@ -202,35 +195,27 @@ def load_dataset_tensor(args, data_dir, training_time):
     if args.dataset_in == 'MNIST':
         trainset = MNIST(root=data_dir, args=args, train=True,
                             download=False,
-                            np_array=True,
                             transform=transforms.ToTensor(),
                             training_time=training_time)
         testset = MNIST(root=data_dir, args=args, train=False,
                                 download=False,
-                                np_array=True,
                                 transform=transforms.ToTensor(),
                                 training_time=training_time)
         data_details = {'n_channels':1, 'h_in':28, 'w_in':28, 'scale':255.0}
     elif args.dataset_in == 'fMNIST':
         trainset = FashionMNIST(root=data_dir, args=args, train=True,
                             download=False,
-                            np_array=True,
                             transform=transforms.ToTensor(),
                             training_time=training_time)
         testset = FashionMNIST(root=data_dir, args=args, train=True,
                                 download=False,
-                                np_array=True, 
                                 transform=transforms.ToTensor(),
                                 training_time=training_time)
         data_details = {'n_channels':1, 'h_in':28, 'w_in':28, 'scale':255.0}
     elif args.dataset_in == 'CIFAR-10':
         trainset = cifar10(root=data_dir, args=args, train=True,
-                            download=False, 
-                            transform=transforms.Compose([
-                                transforms.RandomHorizontalFlip(),
-                                transforms.RandomCrop(32, 4),
-                                transforms.ToTensor()
-                            ]),
+                            download=False,
+                            transform=transforms.ToTensor(),
                             training_time=training_time)
         testset = cifar10(root=data_dir, args=args,
                                 train=False,

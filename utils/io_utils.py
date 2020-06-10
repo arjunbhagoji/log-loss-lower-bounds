@@ -12,6 +12,8 @@ def model_naming(args):
 		model_name += '_lr-sch' + str(args.lr_schedule)
 	if args.attack != 'PGD_l2' and args.attack != 'PGD_linf':
 		model_name += '_' + str(args.attack)
+		if args.marking_strat != 'matched':
+			model_name += '_' + str(args.marking_strat)
 	if args.is_adv:
 		model_name += '_robust' + '_eps' + str(args.epsilon) + '_k' + str(args.attack_iter) + '_delta' + str(args.eps_step)
 	if args.eps_schedule != 0:
@@ -31,6 +33,8 @@ def model_naming(args):
 			model_name += '_approx' + str(args.drop_thresh)
 		elif args.marking_strat == 'random':
 			model_name += '_random' + str(args.drop_thresh)
+	if args.curriculum != 'all':
+		model_name += '_curr' + str(args.curriculum)
 	model_name_base = model_name
 	if args.trial_num is not None:
 		model_name += '_tr' + str(args.trial_num)
@@ -106,5 +110,21 @@ def test_file_save_name(args, model_name):
 	if args.new_num_restarts != 1:
 	    test_output_fname += '_restart' + str(args.new_num_restarts)
 	test_output_fname += '.txt'
+
+	return test_output_fname
+
+def test_probs_save_name(args, model_name):
+	test_output_dir = 'probs_output' + '/' + args.dataset_in
+	if not os.path.exists(test_output_dir):
+	    os.makedirs(test_output_dir)
+	test_output_fname = test_output_dir + '/' + model_name + '_' + args.new_attack
+	if 'hybrid' in args.new_attack:
+	    test_output_fname += '_mark_' + args.new_marking_strat
+	if args.eps_step != args.new_eps_step or args.attack_iter != args.new_attack_iter:
+	    test_output_fname += '_delta' + \
+	        str(args.new_eps_step) + '_t' + str(args.new_attack_iter)
+	if args.new_num_restarts != 1:
+	    test_output_fname += '_restart' + str(args.new_num_restarts)
+	# test_output_fname += '.txt'
 
 	return test_output_fname

@@ -5,6 +5,7 @@ import torchvision
 import numpy as np
 import time
 import os 
+from scipy.special import softmax
 
 import collections
 import json 
@@ -236,6 +237,7 @@ def robust_test(model, loss_fn, loader, args, att_dir, epoch=0, training_output_
     steps = 1
     losses_adv = []
     losses_ben = []
+    prob_dict = {}
     if args.track_hard:
       loss_dict = collections.OrderedDict()
       pred_dict = {}
@@ -279,6 +281,13 @@ def robust_test(model, loss_fn, loader, args, att_dir, epoch=0, training_output_
         num_correct += (preds == y).sum()
         num_correct_adv += (preds_adv == y).sum()
         num_samples += len(preds)
+        # Adding probs to dict
+        count=0
+        for i in idx.numpy():
+          score_curr = scores_adv[count].cpu().detach().numpy()
+          prob_dict[str(i)] = softmax(score_curr)
+          # print(count)
+          count+=1
 
         if args.track_hard:
           idx_matched = idx[~ez].numpy()
@@ -331,4 +340,4 @@ def robust_test(model, loss_fn, loader, args, att_dir, epoch=0, training_output_
         print('Ben loss easy: %.8f' % np.mean(loss_dict['batch_losses_ben_easy']))
         print('Ben loss hard: %.8f' % np.mean(loss_dict['batch_losses_ben_hard']))
 
-    return 100.*acc, 100.*acc_adv, np.mean(losses_ben), np.mean(losses_adv)
+    return 100.*acc, 100.*acc_adv, np.mean(losses_ben), np.mean(losses_adv), prob_dict
