@@ -8,8 +8,7 @@ import numpy as np
 import torch
 import codecs
 import json
-from torchvision.datasets.utils import download_url, download_and_extract_archive, extract_archive, \
-    makedir_exist_ok, verify_str_arg
+from torchvision.datasets.utils import download_url, download_and_extract_archive, extract_archive, verify_str_arg
 from .io_utils import matching_file_name, degree_file_name, distance_file_name, global_matching_file_name
 
 
@@ -29,11 +28,11 @@ class MNIST(VisionDataset):
         target_transform (callable, optional): A function/transform that takes in the
             target and transforms it.
     """
-    urls = [
-        'http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz',
-        'http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz',
-        'http://yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz',
-        'http://yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz',
+    resources = [
+        ("http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz", "f68b3c2dcbeaaa9fbdd348bbdeb94873"),
+        ("http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz", "d53e105ee54ea40749a09fcbcd1e9432"),
+        ("http://yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz", "9fb629c4189551a2d022fa330f9573f3"),
+        ("http://yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz", "ec29112dd5afa0611ce80d1b7f02629c")
     ]
     training_file = 'training.pt'
     test_file = 'test.pt'
@@ -97,7 +96,7 @@ class MNIST(VisionDataset):
 
         # Tracking paired points
         if self.marking_strat is not None:
-            print('Using %s to mark' % self.marking_strat)
+            # print('Using %s to mark' % self.marking_strat)
             if self.marking_strat == 'matched':
                 mask_matched = self._matching_filter(args, num_samples)
             elif self.marking_strat == 'approx':
@@ -346,13 +345,13 @@ class MNIST(VisionDataset):
         if self._check_exists():
             return
 
-        makedir_exist_ok(self.raw_folder)
-        makedir_exist_ok(self.processed_folder)
+        os.makedirs(self.raw_folder, exist_ok=True)
+        os.makedirs(self.processed_folder, exist_ok=True)
 
         # download files
-        for url in self.urls:
+        for url, md5 in self.resources:
             filename = url.rpartition('/')[2]
-            download_and_extract_archive(url, download_root=self.raw_folder, filename=filename)
+            download_and_extract_archive(url, download_root=self.raw_folder, filename=filename, md5=md5)
 
         # process and save as torch files
         print('Processing...')
@@ -376,9 +375,10 @@ class MNIST(VisionDataset):
         return "Split: {}".format("Train" if self.train is True else "Test")
 
 
+
+
 class FashionMNIST(MNIST):
     """`Fashion-MNIST <https://github.com/zalandoresearch/fashion-mnist>`_ Dataset.
-
     Args:
         root (string): Root directory of dataset where ``Fashion-MNIST/processed/training.pt``
             and  ``Fashion-MNIST/processed/test.pt`` exist.
@@ -392,14 +392,19 @@ class FashionMNIST(MNIST):
         target_transform (callable, optional): A function/transform that takes in the
             target and transforms it.
     """
-    urls = [
-        'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/train-images-idx3-ubyte.gz',
-        'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/train-labels-idx1-ubyte.gz',
-        'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/t10k-images-idx3-ubyte.gz',
-        'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/t10k-labels-idx1-ubyte.gz',
+    resources = [
+        ("http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/train-images-idx3-ubyte.gz",
+         "8d4fb7e6c68d591d4c3dfef9ec88bf0d"),
+        ("http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/train-labels-idx1-ubyte.gz",
+         "25c81989df183df01b3e8a0aad5dffbe"),
+        ("http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/t10k-images-idx3-ubyte.gz",
+         "bef4ecab320f06d8554ea6380940ec79"),
+        ("http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/t10k-labels-idx1-ubyte.gz",
+         "bb300cfdad3c16e7a12a480ee83cd310")
     ]
     classes = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal',
                'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
+
 
 
 # class KMNIST(MNIST):

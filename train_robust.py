@@ -144,11 +144,11 @@ def main(trial_num):
             f_eval = robust_test
         print('Test set validation')
         # Running validation
-        acc_test, acc_adv_test, test_loss, test_loss_adv = f_eval(net, 
+        acc_test, acc_adv_test, test_loss, test_loss_adv, _ = f_eval(net, 
             criterion, loader_test, args, attack_params, epoch, training_output_dir_name, 
             None,n_batches=n_batches_eval, train_data=False, training_time=True) 
         print('Training set validation')
-        acc_train, acc_adv_train, train_loss, train_loss_adv = f_eval(net, 
+        acc_train, acc_adv_train, train_loss, train_loss_adv, _ = f_eval(net, 
             criterion, loader_train_all, args, attack_params, epoch, training_output_dir_name, 
             None, n_batches=n_batches_eval, train_data=True, training_time=True)
         # if epoch>0:

@@ -114,12 +114,12 @@ def load_mnist_dataset_custom(args, data_dir, training_time):
                             training_time=training_time)
     elif args.dataset_in == 'fMNIST':
         trainset = FashionMNIST(root=data_dir, args=args, train=True,
-                                    download=False, 
+                                    download=True, 
                                     transform=transforms.ToTensor(),
                                     dropping=args.dropping,
                                     training_time=training_time)
         testset = FashionMNIST(root=data_dir, args=args, train=False,
-                                    download=False, 
+                                    download=True, 
                                     transform=transforms.ToTensor(),
                                     dropping=args.dropping,
                                     training_time=training_time)

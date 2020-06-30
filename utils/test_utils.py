@@ -99,6 +99,7 @@ def robust_test_hybrid(model, loss_fn, loader, args, att_dir, epoch=0, training_
   losses_ben = []
   loss_dict = collections.OrderedDict()
   pred_dict = {}
+  prob_dict = {}
   if training_time and args.track_hard:
     f_name = training_output_dir_name + 'losses.json'
     f = open(f_name,'a+')
@@ -171,6 +172,15 @@ def robust_test_hybrid(model, loss_fn, loader, args, att_dir, epoch=0, training_
       num_correct_adv += (preds_adv == y).sum()
       num_samples += len(preds)
 
+      # Adding probs to dict
+      count=0
+      for i in idx.numpy():
+        score_curr = scores_adv[count].cpu().detach().numpy()
+        prob_dict[str(i)] = softmax(score_curr)
+        # print(count)
+        count+=1
+
+
       # Tracking hard point losses and predictions
       idx_matched = idx[~ez].numpy()
       m_matched = m[~ez].numpy()
@@ -223,7 +233,7 @@ def robust_test_hybrid(model, loss_fn, loader, args, att_dir, epoch=0, training_
       print('Ben loss easy: %.8f' % np.mean(loss_dict['batch_losses_ben_easy']))
       print('Ben loss hard: %.8f' % np.mean(loss_dict['batch_losses_ben_hard']))
 
-  return 100.*acc, 100.*acc_adv, np.mean(losses_ben), np.mean(losses_adv)
+  return 100.*acc, 100.*acc_adv, np.mean(losses_ben), np.mean(losses_adv), prob_dict
 
 
 def robust_test(model, loss_fn, loader, args, att_dir, epoch=0, training_output_dir_name=None, 
