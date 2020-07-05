@@ -1,5 +1,6 @@
 import torch
 from torch.autograd import Variable
+import torch.nn as nn
 
 import numpy as np
 import time
@@ -8,6 +9,10 @@ import json
 
 from .attack_utils import cal_loss, generate_target_label_tensor, pgd_attack, pgd_l2_attack, hybrid_attack
 from .data_utils import load_dataset_tensor
+from .loss_utils import KL_loss_flat
+
+class_1 = 3
+class_2 = 7
 
 def eps_scheduler(epoch, args):
     eps_scale = (args.eps_step*args.attack_iter)/args.epsilon
@@ -40,7 +45,7 @@ def update_hyparam(epoch, args):
 
 
 ########################################  Natural training ########################################
-def train_one_epoch(model, loss_fn, optimizer, loader_train, args, verbose=True):
+def train_one_epoch(model, optimizer, loader_train, args, verbose=True):
     losses = []
     model.train()
     for t, (x, y, idx, ez, m) in enumerate(loader_train):
@@ -50,7 +55,9 @@ def train_one_epoch(model, loss_fn, optimizer, loader_train, args, verbose=True)
         y_var = Variable(y, requires_grad= False)
         scores = model(x_var)
         # loss = loss_fn(scores, y_var)
-        batch_loss = loss_fn(scores, y_var)
+        if args.loss_fn=='CE':
+          loss_function = nn.CrossEntropyLoss(reduction='none') 
+          batch_loss = loss_function(scores, y_var)
         loss = torch.mean(batch_loss)
         losses.append(loss.data.cpu().numpy())
         optimizer.zero_grad()
@@ -63,7 +70,7 @@ def train_one_epoch(model, loss_fn, optimizer, loader_train, args, verbose=True)
 
 
 ########################################  Adversarial training ########################################
-def robust_train_one_epoch(model, loss_fn, optimizer, loader_train, args, eps, 
+def robust_train_one_epoch(model, optimizer, loader_train, args, eps, 
                             delta, epoch, training_output_dir_name, verbose=True):
     print('Current eps: {}, delta: {}'.format(eps, delta))
     losses = []
@@ -74,6 +81,10 @@ def robust_train_one_epoch(model, loss_fn, optimizer, loader_train, args, eps,
       trainset, testset, data_details = load_dataset_tensor(args, 
                                     data_dir='data', training_time=training_time)
       print('Data loaded for hybrid attack of len {}'.format(len(trainset)))
+    if 'KL' in args.loss_fn:
+      opt_prob_dir = 'graph_data/optimal_probs/'
+      opt_fname = 'logloss_' + str(class_1) + '_' + str(class_2) + '_' + str(args.num_samples) + '_' + args.dataset_in + '_' + args.norm + '_' + str(args.epsilon) + '.txt'
+      optimal_scores_overall = np.loadtxt(opt_prob_dir+opt_fname)
     for t, (x, y, idx, ez, m) in enumerate(loader_train):
         x = x.cuda()
         y = y.cuda()
@@ -116,10 +127,21 @@ def robust_train_one_epoch(model, loss_fn, optimizer, loader_train, args, eps,
             x_mod = hybrid_attack(matched_x, ez, m, rel_data, args.new_epsilon)
             adv_x = torch.cat((adv_x, x_mod))
         scores = model(adv_x)
-        batch_loss_adv = loss_fn(scores, y_var)
+        if args.loss_fn == 'CE':
+          loss_function = nn.CrossEntropyLoss(reduction='none')
+          batch_loss_adv = loss_function(scores, y_var)
+          batch_loss_ben = loss_function(model(x),y_var)
+        elif args.loss_fn == 'KL':
+          optimal_scores = torch.from_numpy(optimal_scores_overall[idx]).float().cuda()
+          loss_function = nn.KLDivLoss(reduction='none')
+          batch_loss_adv = loss_function(scores, optimal_scores)
+          batch_loss_ben = loss_function(model(x), optimal_scores)
+        elif args.loss_fn == 'KL_flat':
+          optimal_scores = torch.from_numpy(optimal_scores_overall[idx]).float().cuda()
+          batch_loss_adv = KL_loss_flat(scores, optimal_scores, y_var, t)
+          batch_loss_ben = KL_loss_flat(model(x), optimal_scores, y_var, t)
         loss = torch.mean(batch_loss_adv)
         losses.append(loss.data.cpu().numpy())
-        batch_loss_ben = loss_fn(model(x),y_var)
         loss_ben = torch.mean(batch_loss_ben)
         losses_ben.append(loss_ben.data.cpu().numpy())
         # GD step

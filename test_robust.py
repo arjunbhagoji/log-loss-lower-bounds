@@ -109,14 +109,15 @@ def main(trial_num):
     print('Train loss adv:%s' % loss_train_adv)
     # Saving test output
     test_output_fname = test_file_save_name(args, model_name)
+    print(test_output_fname)
     acc_train_list.append(acc_train)
     acc_train_adv_list.append(acc_train_adv)
     acc_test_list.append(acc_test)
     acc_test_adv_list.append(acc_test_adv)
 
     probs_output_fname = test_probs_save_name(args,model_name)
-    np.savetxt(probs_output_fname + '_train.txt',all_probs_train, fmt='%.5f')
-    np.savetxt(probs_output_fname + '_test.txt',all_probs_test, fmt='%.5f')
+    np.savetxt(probs_output_fname + '_train_tr%s.txt' % (args.trial_num) ,all_probs_train, fmt='%.5f')
+    np.savetxt(probs_output_fname + '_test_tr%s.txt' % (args.trial_num),all_probs_test, fmt='%.5f')
 
     if args.save_test:
         f = open(test_output_fname, mode='a')
@@ -170,6 +171,7 @@ if __name__ == '__main__':
     parser.add_argument("--norm", default='l2', help="norm to be used")
     parser.add_argument('--drop_thresh', type=int, default=100)
     parser.add_argument('--curriculum', type=str, default='all')
+    parser.add_argument('--loss_fn', type=str, default='CE')
 
     # Attack args
     parser.add_argument('--new_attack', type=str, default='PGD_l2',
