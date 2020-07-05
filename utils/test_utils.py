@@ -180,7 +180,6 @@ def robust_test_hybrid(model, loss_fn, loader, args, att_dir, epoch=0, training_
         # print(count)
         count+=1
 
-
       # Tracking hard point losses and predictions
       idx_matched = idx[~ez].numpy()
       m_matched = m[~ez].numpy()

@@ -92,7 +92,7 @@ def main(trial_num):
         net.load_state_dict(torch.load(model_dir_name + ckpt_path))
         robust_test_during_train(net, loader_test, args, n_batches=10)
 
-    criterion = nn.CrossEntropyLoss(reduction='none')
+    criterion = nn.CrossEntropyLoss(reduction='none') 
     # criterion = nn.CrossEntropyLoss()
 
     optimizer = torch.optim.SGD(net.parameters(),
@@ -127,11 +127,11 @@ def main(trial_num):
             curriculum_step, early_stop_counter = curriculum_checker(args, epoch, curriculum_step, early_stop_counter)
             loader_train = loader_list[curriculum_step]
         if not args.is_adv:
-            curr_loss = train_one_epoch(net, criterion, optimizer, 
+            curr_loss = train_one_epoch(net, optimizer, 
                                   loader_train, args, verbose=False)
             ben_loss = curr_loss
         else:
-            curr_loss, ben_loss = robust_train_one_epoch(net, criterion, 
+            curr_loss, ben_loss = robust_train_one_epoch(net,
                                     optimizer, loader_train, args, eps, delta, 
                                     epoch, training_output_dir_name, verbose=False)
         print('time_taken for #{} epoch = {:.3f}'.format(epoch+1, time.time()-start_time))
@@ -176,6 +176,7 @@ def main(trial_num):
                 writer.add_scalar('Loss/train_ben', train_loss, epoch)
             else:
                 writer.add_scalar('Loss/train_ben', 0, epoch)
+        #To-do: track KL loss
         print('Train loss - Adv: %s Ben: %s; Test loss - Adv: %s; Ben: %s' %
             (train_loss_adv, train_loss, test_loss_adv, test_loss))
         scheduler.step()
@@ -209,6 +210,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr_schedule', type=str, default='linear0')
     parser.add_argument('--weight_decay', type=float, default=2e-4)
     parser.add_argument('--curriculum', type=str, default='all')
+    parser.add_argument('--loss_fn', type=str, default='CE')
 
     # Attack args
     parser.add_argument('--is_adv', dest='is_adv', action='store_true')

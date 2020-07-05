@@ -182,7 +182,7 @@ if args.use_test:
 else:
 	save_file_name = 'logloss_' + str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.dataset_in + '_' + args.norm
 
-# f = open('cost_results/' + save_file_name + '.txt', 'a')
+f = open('cost_results/' + save_file_name + '.txt', 'a')
 
 if args.use_test:
 	dist_mat_name = args.dataset_in + '_test_' + str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.norm + '.npy'
@@ -238,5 +238,5 @@ for i in range(len(classifier_probs)):
 loss=-1*loss/len(classifier_probs)
 print('Log loss for eps %s is %s' % (eps,loss))
 
-# f.write(str(eps)+','+ str(loss) + '\n')
+f.write(str(eps)+','+ str(loss) + '\n')
 np.savetxt('graph_data/optimal_probs/' + save_file_name + '_' + str(eps) + '.txt', classifier_probs, fmt='%.5f')
