@@ -11,35 +11,36 @@ python test_robust.py \
 	--batch_size 128 \
 	--test_batch_size 128 \
 	--lr_schedule ${9} \
-	--attack ${10} \
-	--epsilon ${11} \
-	--attack_iter ${12} \
-	--gamma ${13} \
+	--learning_rate ${10} \
+	--attack ${11} \
+	--epsilon ${12} \
+	--attack_iter ${13} \
+	--gamma ${14} \
 	--clip_min 0.0 \
 	--clip_max 1.0 \
-	--eps_schedule ${14} \
-	--num_restarts ${15} \
+	--eps_schedule ${15} \
+	--num_restarts ${16} \
 	--last_epoch 0 \
 	--checkpoint_path trained_models \
-	--marking_strat ${16} \
+	--marking_strat ${17} \
 	--matching_path matchings \
 	--degree_path graph_data/degree_results \
-	--norm ${17} \
-	--drop_thresh ${18} \
-	--curriculum ${19} \
-	--loss_fn ${20} \
-	--new_attack ${21} \
-	--new_epsilon ${22} \
-	--new_attack_iter ${23} \
-	--new_gamma ${24} \
-	--new_num_restarts ${25} \
-	--new_marking_strat ${26} \
-	--num_of_trials ${27} \
-	${28} `#is_adv` \
-	${29} `#targeted` \
-	${30} `#rand_init` \
-	${31} `#is_dropping` \
-	${32} `#is_viz` \
-	${33} `#save_test` \
-	${34} `#track_hard` \
-	${35} `#new_rand_init` \
+	--norm ${18} \
+	--drop_thresh ${19} \
+	--curriculum ${20} \
+	--loss_fn ${21} \
+	--new_attack ${22} \
+	--new_epsilon ${23} \
+	--new_attack_iter ${24} \
+	--new_gamma ${25} \
+	--new_num_restarts ${26} \
+	--new_marking_strat ${27} \
+	--num_of_trials ${28} \
+	${29} `#is_adv` \
+	${30} `#targeted` \
+	${31} `#rand_init` \
+	${32} `#is_dropping` \
+	${33} `#is_viz` \
+	${34} `#save_test` \
+	${35} `#track_hard` \
+	${36} `#new_rand_init` \

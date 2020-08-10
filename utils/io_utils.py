@@ -72,7 +72,9 @@ def model_naming(args):
 	model_name = args.model
 	if 'wrn' in args.model:
 		model_name += '-' + str(args.depth) + '-' + str(args.width)
-	if 'cnn_3l' in args.model or 'lenet5' in args.model:
+	elif 'resnet' in args.model:
+		model_name += str(args.depth)
+	elif 'cnn_3l' in args.model or 'lenet5' in args.model:
 		if args.conv_expand != 1 or args.fc_expand != 1:
 			model_name += '-conv' + str(args.conv_expand) + '-fc' + str(args.fc_expand) 
 	if args.loss_fn != 'CE':

@@ -14,6 +14,7 @@ import argparse
 from torchsummary import summary
 
 from utils.mnist_models import cnn_3l, cnn_3l_bn
+from utils.resnet_cifar import resnet
 from utils.cifar10_models import WideResNet
 from utils.densenet_model import DenseNet
 from utils.test_utils import test, robust_test, robust_test_hybrid
@@ -57,6 +58,8 @@ def main(trial_num):
         elif 'dn' in args.model:
             net = DenseNet(growthRate=12, depth=100, reduction=0.5,
                            bottleneck=True, nClasses=args.n_classes, ChannelsIn=num_channels)
+        elif 'resnet' in args.model:
+            net = resnet(depth=args.depth,num_classes=args.n_classes)
 
     if 'linf' in args.attack:
         args.epsilon /= 255.
@@ -142,7 +145,7 @@ if __name__ == '__main__':
 
     # Model args
     parser.add_argument('--model', type=str, default='cnn_3l',
-                        choices=['wrn', 'cnn_3l', 'cnn_3l_bn', 'dn'])
+                        choices=['resnet','wrn', 'cnn_3l', 'cnn_3l_bn', 'dn'])
     parser.add_argument('--conv_expand', type=int, default=1)
     parser.add_argument('--fc_expand', type=int, default=1)
     parser.add_argument('--depth', type=int, default=28)
@@ -150,7 +153,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr_schedule', type=str, default='linear0')
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--test_batch_size', type=int, default=128)
-    # parser.add_argument('--learning_rate', type=float, default=0.1)
+    parser.add_argument('--learning_rate', type=float, default=0.1)
     # parser.add_argument('--weight_decay', type=float, default=2e-4)
 
     # Defense args
