@@ -79,6 +79,8 @@ def model_naming(args):
 		model_name += '_' + args.loss_fn
 	if args.lr_schedule != 'linear0':
 		model_name += '_lr-sch' + str(args.lr_schedule)
+	if args.learning_rate != 0.1:
+		model_name += '_lr' + str(args.learning_rate)
 	if args.attack != 'PGD_l2' and args.attack != 'PGD_linf':
 		model_name += '_' + str(args.attack)
 		if args.marking_strat != 'matched':
@@ -119,6 +121,8 @@ def model_naming_no_eps(args):
 			model_name += '-conv' + str(args.conv_expand) + '-fc' + str(args.fc_expand) 
 	if args.lr_schedule != 'linear0':
 		model_name += '_lr-sch' + str(args.lr_schedule)
+	if args.learning_rate != 0.1:
+		model_name += '_lr' + str(args.learning_rate)
 	if args.attack != 'PGD_l2' and args.attack != 'PGD_linf':
 		model_name += '_' + str(args.attack)
 		if args.marking_strat != 'matched':
@@ -214,8 +218,8 @@ def test_file_save_name(args, model_name):
 	test_output_fname = test_output_dir + '/' + model_name + '_' + args.new_attack
 	if 'hybrid' in args.new_attack:
 	    test_output_fname += '_mark_' + args.new_marking_strat
-	if args.eps_step != args.new_eps_step or args.attack_iter != args.new_attack_iter:
-	    test_output_fname += '_delta' + \
+	if args.epsilon!=args.new_epsilon or args.eps_step != args.new_eps_step or args.attack_iter != args.new_attack_iter:
+	    test_output_fname += '_eps' + str(args.new_epsilon) + '_delta' + \
 	        str(args.new_eps_step) + '_t' + str(args.new_attack_iter)
 	if args.new_num_restarts != 1:
 	    test_output_fname += '_restart' + str(args.new_num_restarts)
