@@ -72,13 +72,17 @@ def model_naming(args):
 	model_name = args.model
 	if 'wrn' in args.model:
 		model_name += '-' + str(args.depth) + '-' + str(args.width)
-	if 'cnn_3l' in args.model or 'lenet5' in args.model:
+	elif 'resnet' in args.model:
+		model_name += str(args.depth)
+	elif 'cnn_3l' in args.model or 'lenet5' in args.model:
 		if args.conv_expand != 1 or args.fc_expand != 1:
 			model_name += '-conv' + str(args.conv_expand) + '-fc' + str(args.fc_expand) 
 	if args.loss_fn != 'CE':
 		model_name += '_' + args.loss_fn
 	if args.lr_schedule != 'linear0':
 		model_name += '_lr-sch' + str(args.lr_schedule)
+	if args.learning_rate != 0.1:
+		model_name += '_lr' + str(args.learning_rate)
 	if args.attack != 'PGD_l2' and args.attack != 'PGD_linf':
 		model_name += '_' + str(args.attack)
 		if args.marking_strat != 'matched':
@@ -119,6 +123,8 @@ def model_naming_no_eps(args):
 			model_name += '-conv' + str(args.conv_expand) + '-fc' + str(args.fc_expand) 
 	if args.lr_schedule != 'linear0':
 		model_name += '_lr-sch' + str(args.lr_schedule)
+	if args.learning_rate != 0.1:
+		model_name += '_lr' + str(args.learning_rate)
 	if args.attack != 'PGD_l2' and args.attack != 'PGD_linf':
 		model_name += '_' + str(args.attack)
 		if args.marking_strat != 'matched':

@@ -68,7 +68,7 @@ def load_mnist_dataset(args, data_dir, training_time):
 def load_cifar_dataset(args, data_dir, training_time):
     # CIFAR-10 data loaders
     trainset = datasets.CIFAR10(root=data_dir, train=True,
-                                download=False, 
+                                download=True, 
                                 transform=transforms.Compose([
                                     transforms.RandomHorizontalFlip(),
                                     transforms.RandomCrop(32, 4),
@@ -79,7 +79,7 @@ def load_cifar_dataset(args, data_dir, training_time):
                                 shuffle=True)
 
     testset = datasets.CIFAR10(root=data_dir,
-                                train=False,
+                                train=True,
                                 download=False, transform=transforms.ToTensor(),
                                 training_time=training_time)
     loader_test = torch.utils.data.DataLoader(testset, 
@@ -138,7 +138,11 @@ def load_cifar_dataset_custom(args, data_dir, training_time):
     # CIFAR-10 data loaders
     trainset = cifar10(root=data_dir, args=args, train=True,
                                 download=False, 
-                                transform=transforms.ToTensor(),
+                                transform=transforms.Compose([
+                                    transforms.RandomHorizontalFlip(),
+                                    transforms.RandomCrop(32, 4),
+                                    transforms.ToTensor()
+                                ]),
                                 dropping=args.dropping,
                                 training_time=training_time)
     loader_train = torch.utils.data.DataLoader(trainset, 
