@@ -181,9 +181,9 @@ def init_dirs(args, train=True):
 		
 def matching_file_name(args, class_1, class_2, train_data, num_samples):
 	if train_data:
-		matching_file_name = args.matching_path + '/' + args.dataset_in + '/' + str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.dataset_in + '_' + args.norm + '_cost_zero_' + '{0:.1f}.npy'.format(args.epsilon)
+		matching_file_name = args.matching_path + '/' + args.dataset_in + '/' + str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.dataset_in + '_' + args.norm + '_cost_zero_' + '{0:.1f}.npy'.format(args.drop_eps)
 	else:
-		matching_file_name = args.matching_path + '/' + args.dataset_in + '/' + str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.dataset_in + '_test_' + args.norm + '_cost_zero_' + '{0:.1f}.npy'.format(args.epsilon)
+		matching_file_name = args.matching_path + '/' + args.dataset_in + '/' + str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.dataset_in + '_test_' + args.norm + '_cost_zero_' + '{0:.1f}.npy'.format(args.drop_eps)
 	return matching_file_name
 
 def global_matching_file_name(args, class_1, class_2, train_data, num_samples):

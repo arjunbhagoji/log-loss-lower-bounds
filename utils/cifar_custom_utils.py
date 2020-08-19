@@ -17,6 +17,9 @@ else:
 
 from torchvision.datasets.vision import VisionDataset
 from torchvision.datasets.utils import check_integrity, download_and_extract_archive
+from .io_utils import matching_file_name, degree_file_name, distance_file_name, global_matching_file_name
+
+
 
 class cifar10(VisionDataset):
     """`CIFAR10 <https://www.cs.toronto.edu/~kriz/cifar.html>`_ Dataset.
@@ -114,7 +117,7 @@ class cifar10(VisionDataset):
         self.matched_idx = -1*np.ones(2*num_samples)
 
         # Tracking paired points
-        if marking_strat is not None:
+        if marking_strat is not None and self.train:
             print('Using %s to mark' % marking_strat)
             if marking_strat == 'matched':
                 mask_matched = self._matching_filter(args, num_samples)
@@ -132,7 +135,7 @@ class cifar10(VisionDataset):
         # print('No. of samples in use: {}'.format(len(self.data)))
         
         # Checking if points need to be dropped  
-        if self.dropping and self.training_time:
+        if self.dropping and self.training_time and self.train:
             if marking_strat == 'distance':
                 raise ValueError('Distance-based marking cannot be used at train time')
             print('Filtering training data')
@@ -192,7 +195,7 @@ class cifar10(VisionDataset):
         class_1 = 3
         class_2 = 7
         mask_matched = np.ones(2*num_samples,dtype=bool)
-        # print(matching_file_name(args,class_1,class_2, self.train, num_samples))
+        print(matching_file_name(args,class_1,class_2, self.train, num_samples))
         if os.path.exists(matching_file_name(args,class_1,class_2, self.train, num_samples)):
             output = np.load(matching_file_name(args, class_1, class_2, self.train, num_samples))
         else:
@@ -202,9 +205,10 @@ class cifar10(VisionDataset):
             print('No matching')
             # return self.data, self.targets
         else:
-            # Dropping at random
+            # Loading matching
             for i in range(num_matched):
                 coin = np.random.random_sample()
+                # Determining which sample to drop
                 if coin < 0.5:
                     mask_matched[output[0][i]] = False
                 else:
@@ -240,7 +244,7 @@ class cifar10(VisionDataset):
             print('No matching')
             # return self.data, self.targets
         else:
-            # Dropping at random
+            # Loading matching
             for k in output_dict:
                 self.easy_idx[int(k)] = False
                 self.matched_idx[int(k)] = int(output_dict[k][0])
