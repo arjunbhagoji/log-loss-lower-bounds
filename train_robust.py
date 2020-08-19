@@ -236,7 +236,7 @@ if __name__ == '__main__':
     parser.add_argument('--curr_epoch', type=int, default=0)
     parser.add_argument('--save_checkpoint', dest='save_checkpoint', action='store_true')
     parser.add_argument('--load_checkpoint', dest='load_checkpoint', action='store_true')
-    parser.add_argument('--checkpoint_path', type=str, default='trained_models')
+    parser.add_argument('--checkpoint_path', type=str, default='/data/abhagoji/models')
 
     # Matching args
     parser.add_argument('--track_hard', dest='track_hard', action='store_true')
@@ -246,10 +246,13 @@ if __name__ == '__main__':
     parser.add_argument('--degree_path', type=str, default='graph_data/degree_results')
     parser.add_argument("--norm", default='l2', help="norm to be used")
     parser.add_argument('--drop_thresh', type=int, default=100)
+    parser.add_argument('--drop_eps',type=float, default=None)
     
     args = parser.parse_args()
     if args.num_samples is None:
         args.num_samples = 'All'
+    if args.drop_eps is None:
+        args.drop_eps=args.epsilon
 
     args.eps_step = args.epsilon*args.gamma/args.attack_iter
     attack_params = {'attack': args.attack, 'epsilon': args.epsilon, 
@@ -258,6 +261,8 @@ if __name__ == '__main__':
                      'clip_max': args.clip_max,'rand_init': args.rand_init, 
                      'num_restarts': args.num_restarts}
 
+    args.checkpoint_path = 'data/abhagoji/models'
+    print(args.checkpoint_path)
     # Running trials 
     for idx in range(args.num_of_trials):
         main(idx+1)

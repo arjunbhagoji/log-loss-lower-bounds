@@ -33,10 +33,11 @@ python train_robust.py \
 	--degree_path graph_data/degree_results \
 	--norm ${22} \
 	--drop_thresh ${23} \
-	${24} `#is_adv` \
-	${25} `#targeted` \
-	${26} `#rand_init` \
-	${27} `#save_checkpoint` \
-	${28} `#load_checkpoint` \
-	${29} `#track_hard` \
-	${30} `#is_dropping`
+	--drop_eps ${24} \
+	${25} `#is_adv` \
+	${26} `#targeted` \
+	${27} `#rand_init` \
+	${28} `#save_checkpoint` \
+	${29} `#load_checkpoint` \
+	${30} `#track_hard` \
+	${31} `#is_dropping`
