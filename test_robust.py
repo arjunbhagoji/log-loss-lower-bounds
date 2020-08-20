@@ -173,6 +173,7 @@ if __name__ == '__main__':
     parser.add_argument('--degree_path', type=str, default='graph_data/degree_results')
     parser.add_argument("--norm", default='l2', help="norm to be used")
     parser.add_argument('--drop_thresh', type=int, default=100)
+    parser.add_argument('--drop_eps',type=float, default=None)
     parser.add_argument('--curriculum', type=str, default='all')
     parser.add_argument('--loss_fn', type=str, default='CE')
 
@@ -192,8 +193,8 @@ if __name__ == '__main__':
 
     # IO args
     parser.add_argument('--last_epoch', type=int, default=0)
-    parser.add_argument('--checkpoint_path', type=str,
-                        default='trained_models')
+    parser.add_argument('--checkpoint_path', type=str, 
+                        default='/data/abhagoji/models')
     parser.add_argument('--is_viz', dest='viz', action='store_true')
     
     # Trial args
@@ -207,6 +208,9 @@ if __name__ == '__main__':
         raise ValueError('Needs a working GPU!')
 
     args = parser.parse_args()
+
+    args.checkpoint_path = 'data/abhagoji/models'
+
 
     acc_train_list = []
     acc_train_adv_list = []

@@ -27,20 +27,21 @@ python test_robust.py \
 	--degree_path graph_data/degree_results \
 	--norm ${18} \
 	--drop_thresh ${19} \
-	--curriculum ${20} \
-	--loss_fn ${21} \
-	--new_attack ${22} \
-	--new_epsilon ${23} \
-	--new_attack_iter ${24} \
-	--new_gamma ${25} \
-	--new_num_restarts ${26} \
-	--new_marking_strat ${27} \
-	--num_of_trials ${28} \
-	${29} `#is_adv` \
-	${30} `#targeted` \
-	${31} `#rand_init` \
-	${32} `#is_dropping` \
-	${33} `#is_viz` \
-	${34} `#save_test` \
-	${35} `#track_hard` \
-	${36} `#new_rand_init` \
+	--drop_eps ${20} \
+	--curriculum ${21} \
+	--loss_fn ${22} \
+	--new_attack ${23} \
+	--new_epsilon ${24} \
+	--new_attack_iter ${25} \
+	--new_gamma ${26} \
+	--new_num_restarts ${27} \
+	--new_marking_strat ${28} \
+	--num_of_trials ${29} \
+	${30} `#is_adv` \
+	${31} `#targeted` \
+	${32} `#rand_init` \
+	${33} `#is_dropping` \
+	${34} `#is_viz` \
+	${35} `#save_test` \
+	${36} `#track_hard` \
+	${37} `#new_rand_init` \
