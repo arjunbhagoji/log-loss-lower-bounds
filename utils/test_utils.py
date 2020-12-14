@@ -288,6 +288,8 @@ def robust_test(model, loss_fn, loader, args, att_dir, epoch=0, training_output_
         losses_ben.append(loss_ben.data.cpu().numpy())
         # Correct count
         num_correct += (preds == y).sum()
+#         print(preds)
+#         print(preds_adv)
         num_correct_adv += (preds_adv == y).sum()
         num_samples += len(preds)
         # Adding probs to dict

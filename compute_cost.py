@@ -143,6 +143,7 @@ parser.add_argument('--approx_only', dest='approx_only', action='store_true')
 parser.add_argument('--use_test', dest='use_test', action='store_true')
 parser.add_argument('--track_hard', dest='track_hard', action='store_true')
 parser.add_argument('--new_marking_strat', type=str, default=None)
+parser.add_argument('--no_budgets', type=int, default=1)
 
 args = parser.parse_args()
 
@@ -190,19 +191,24 @@ if 'MNIST' in args.dataset_in or 'CIFAR-10' in args.dataset_in:
 			D_12 = scipy.spatial.distance.cdist(X_c1,X_c2,metric='chebyshev')
 		np.save('distances/' + dist_mat_name, D_12)
 
-if args.norm == 'l2' and 'MNIST' in args.dataset_in:
-	# eps_list = np.linspace(3.2,3.8,4)
-	eps_list = np.linspace(4.0,5.0,2)
-	# eps_list=[2.6,2.8]
-elif args.norm == 'l2' and 'CIFAR-10' in args.dataset_in:
-	eps_list = np.linspace(4.0,10.0,13)
-elif args.norm == 'linf' and 'MNIST' in args.dataset_in:
-	eps_list = np.linspace(0.1,0.5,5)
-elif args.norm == 'linf' and 'CIFAR-10' in args.dataset_in:
-	eps_list = np.linspace(0.1,0.5,5)
+# if args.norm == 'l2' and 'MNIST' in args.dataset_in:
+# 	# eps_list = np.linspace(3.2,3.8,4)
+# 	eps_list = np.linspace(4.0,5.0,2)
+# 	# eps_list=[2.6,2.8]
+# elif args.norm == 'l2' and 'CIFAR-10' in args.dataset_in:
+# 	eps_list = np.linspace(4.0,10.0,13)
+# elif args.norm == 'linf' and 'MNIST' in args.dataset_in:
+# 	eps_list = np.linspace(0.1,0.5,5)
+# elif args.norm == 'linf' and 'CIFAR-10' in args.dataset_in:
+# 	eps_list = np.linspace(0.1,0.5,5)
 
 if args.eps is not None:
-	eps_list = [args.eps]
+	if args.no_budgets == 1:
+		eps_list = [2*args.eps]
+	elif args.no_budgets == 2:
+		eps_1 = 0.0
+		eps_2 = args.eps
+		eps_list = [2*eps_1, eps_1+eps_2, eps_1+eps_2, 2*eps_2]
 
 print(eps_list)
 
@@ -212,6 +218,7 @@ if args.use_test:
 else:
 	save_file_name = str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.dataset_in + '_' + args.norm
 	save_file_name_c0 = str(class_1) + '_' + str(class_2) + '_' + str(num_samples) + '_' + args.dataset_in + '_' + args.norm + '_cost_zero'
+
 
 if not os.path.exists('cost_results'):
 	os.makedirs('cost_results')
@@ -231,52 +238,69 @@ f.write('eps,cost,inf_loss'+'\n')
 f2 = open('graph_data/avg_degrees/' + save_file_name + '_avg_deg' + '.txt', 'a')
 f2.write('eps,adn,loss_lb_loose'+'\n')
 
-for eps in eps_list:
+cost_matrix = np.zeros((args.no_budgets*num_samples, args.no_budgets*num_samples))
+
+for i, eps in enumerate(eps_list):
 	print(eps)
-	cost_matrix = D_12 > 2*eps
-	cost_matrix = cost_matrix.astype(float)
+	row = int(i / args.no_budgets)
+	col = int(i % args.no_budgets)
+	print(row,col)
+	cost_matrix[row*num_samples:(row+1)*num_samples,col*num_samples:(col+1)*num_samples] = D_12 > eps
+print('Number of cost 1 edges: %s' % cost_matrix.sum())
+cost_matrix = cost_matrix.astype(float)
+print(cost_matrix)
 
-	# Perform all pre-computation before matching
-	sorted_degrees_dict, adj_list, ind_set, ind_set_comp = degree_calculate(args, cost_matrix, save_file_name)
-	if not os.path.exists('graph_data/greedy_ind/' + save_file_name + '_{0:.1f}.txt'.format(eps)):
-		ind_set = greedy_ind_set(adj_list, ind_set, ind_set_comp)
-	#To-do: read in the ind set file
+# Perform all pre-computation before matching
+# sorted_degrees_dict, adj_list, ind_set, ind_set_comp = degree_calculate(args, cost_matrix, save_file_name)
+# if not os.path.exists('graph_data/greedy_ind/' + save_file_name + '_{0:.1f}.txt'.format(eps)):
+# 	ind_set = greedy_ind_set(adj_list, ind_set, ind_set_comp)
+#To-do: read in the ind set file
 
-	# Decide if matching is to be carried out
-	if not args.approx_only:
-		curr_file_name = 'matchings/' + args.dataset_in + '/' + save_file_name + '_{0:.1f}.npy'.format(eps)
-		curr_file_name_c0 = 'matchings/' + args.dataset_in + '/' + save_file_name_c0 + '_{0:.1f}.npy'.format(eps)
-		if os.path.exists(curr_file_name):
-			print('Loading computed matching')
-			output = np.load(curr_file_name)
-			matching_indices = np.load(curr_file_name_c0)
-			costs = cost_matrix[output[0], output[1]]
-		else:
-			time1 = time.time()
-			
-			output = linear_sum_assignment(cost_matrix)
-			costs = cost_matrix[output[0], output[1]]
-			cost_zero_indices = np.where(costs==0.0)
-			np.save(curr_file_name, output)
-			
-			matching_indices = (output[0][cost_zero_indices], output[1][cost_zero_indices])
-			np.save(curr_file_name_c0, matching_indices)
+# Decide if matching is to be carried out
+if not args.approx_only:
+	if args.no_budgets==1:
+		curr_file_name = 'matchings/' + args.dataset_in + '/' + save_file_name + '_{0:.1f}.npy'.format(args.eps)
+		curr_file_name_c0 = 'matchings/' + args.dataset_in + '/' + save_file_name_c0 + '_{0:.1f}.npy'.format(args.eps)
+	elif args.no_budgets==2:
+		curr_file_name = 'matchings/' + args.dataset_in + '/' + save_file_name + '_{0:.1f}_{0:.1f}.npy'.format(0.0,args.eps)
+		curr_file_name_c0 = 'matchings/' + args.dataset_in + '/' + save_file_name_c0 + '_{0:.1f}_{0:.1f}.npy'.format(0.0,args.eps)
+	if os.path.exists(curr_file_name):
+		print('Loading computed matching')
+		output = np.load(curr_file_name)
+		print('Matching: %s' % output)
+		matching_indices = np.load(curr_file_name_c0)
+		costs = cost_matrix[output[0], output[1]]
+		print(costs)
+	else:
+		time1 = time.time()
+		
+		output = linear_sum_assignment(cost_matrix)
+		print('Matching: %s, %s' % output)
+		# Gives 1d array of relevant costs
+		costs = cost_matrix[output[0], output[1]]
+		print(costs)
+		cost_zero_indices = np.where(costs==0.0)
+		np.save(curr_file_name, output)
+		
+		matching_indices = (output[0][cost_zero_indices], output[1][cost_zero_indices])
+		np.save(curr_file_name_c0, matching_indices)
 
-			time2 = time.time()
+		time2 = time.time()
 
-			print('Time taken for %s examples per class for eps %s is %s' % (num_samples, eps, time2-time1))
+		print('Time taken for %s examples per class for eps %s is %s' % (num_samples, eps, time2-time1))
 
-		raw_cost = np.float(cost_matrix[output[0], output[1]].sum())
+	raw_cost = np.float(cost_matrix[output[0], output[1]].sum())
+	print('Raw cost: %s' % raw_cost)
 
-		# save_adv_images(costs, output[0], output[1], X_c1, X_c2, eps)
+	# save_adv_images(costs, output[0], output[1], X_c1, X_c2, eps)
 
-		mean_cost = raw_cost/(num_samples)
+	mean_cost = raw_cost/(args.no_budgets*num_samples)
 
-		min_error = (1-mean_cost)/2
+	min_error = (1-mean_cost)/2
 
-		print('At eps %s, cost: %s ; inf error: %s' % (eps, mean_cost, min_error)) 
+	print('At eps %s, cost: %s ; inf error: %s' % (args.eps, mean_cost, min_error)) 
 
-		f.write(str(eps)+','+str(mean_cost)+','+str(min_error) + '\n')
+	# f.write(str(eps)+','+str(mean_cost)+','+str(min_error) + '\n')
 
 		# Intersection analysis
 		# matching_indices[1] += num_samples

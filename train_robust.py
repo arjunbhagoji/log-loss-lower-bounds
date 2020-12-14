@@ -13,7 +13,7 @@ import numpy as np
 import time
 import argparse
 from torchsummary import summary
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 
 from utils.mnist_models import cnn_3l, cnn_3l_bn, lenet5
 # from utils.cifar10_models import WideResNet
@@ -29,8 +29,8 @@ def main(trial_num):
     args.trial_num = trial_num
     print(args.curriculum)
     model_dir_name, log_dir_name, figure_dir_name, training_output_dir_name = init_dirs(args, train=True)
-    if args.save_checkpoint:
-        writer = SummaryWriter(log_dir=log_dir_name)
+    # if args.save_checkpoint:
+    #     writer = SummaryWriter(log_dir=log_dir_name)
     print('Training %s' % model_dir_name)
 
     if torch.cuda.is_available():
@@ -172,16 +172,16 @@ def main(trial_num):
                 ckpt_path_best = 'checkpoint_' + str(epoch)
                 torch.save(net.state_dict(), model_dir_name + ckpt_path_best)
                 best_loss_adv = train_loss_adv
-            writer.add_scalar('Loss/train_adv', train_loss_adv, epoch)
-            writer.add_scalar('Loss/test_ben', test_loss, epoch)
-            writer.add_scalar('Loss/test_adv', test_loss_adv, epoch)
-            writer.add_scalar('Acc/test_ben', acc_test, epoch)
-            writer.add_scalar('Acc/test_adv', acc_adv_test, epoch)
-            writer.add_scalar('Lr', lr, epoch)
-            if args.is_adv:
-                writer.add_scalar('Loss/train_ben', train_loss, epoch)
-            else:
-                writer.add_scalar('Loss/train_ben', 0, epoch)
+            # writer.add_scalar('Loss/train_adv', train_loss_adv, epoch)
+            # writer.add_scalar('Loss/test_ben', test_loss, epoch)
+            # writer.add_scalar('Loss/test_adv', test_loss_adv, epoch)
+            # writer.add_scalar('Acc/test_ben', acc_test, epoch)
+            # writer.add_scalar('Acc/test_adv', acc_adv_test, epoch)
+            # writer.add_scalar('Lr', lr, epoch)
+            # if args.is_adv:
+            #     writer.add_scalar('Loss/train_ben', train_loss, epoch)
+            # else:
+            #     writer.add_scalar('Loss/train_ben', 0, epoch)
         #To-do: track KL loss
         print('Train loss - Adv: %s Ben: %s; Test loss - Adv: %s; Ben: %s' %
             (train_loss_adv, train_loss, test_loss_adv, test_loss))
@@ -236,7 +236,7 @@ if __name__ == '__main__':
     parser.add_argument('--curr_epoch', type=int, default=0)
     parser.add_argument('--save_checkpoint', dest='save_checkpoint', action='store_true')
     parser.add_argument('--load_checkpoint', dest='load_checkpoint', action='store_true')
-    parser.add_argument('--checkpoint_path', type=str, default='/data/abhagoji/models')
+    parser.add_argument('--checkpoint_path', type=str, default='trained_models')
 
     # Matching args
     parser.add_argument('--track_hard', dest='track_hard', action='store_true')
@@ -251,7 +251,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.num_samples is None:
         args.num_samples = 'All'
-    if args.drop_eps is None:
+    if args.drop_eps==0:
         args.drop_eps=args.epsilon
 
     args.eps_step = args.epsilon*args.gamma/args.attack_iter
@@ -261,7 +261,7 @@ if __name__ == '__main__':
                      'clip_max': args.clip_max,'rand_init': args.rand_init, 
                      'num_restarts': args.num_restarts}
 
-    args.checkpoint_path = 'data/abhagoji/models'
+    # args.checkpoint_path = '/data/abhagoji/models'
     print(args.checkpoint_path)
     # Running trials 
     for idx in range(args.num_of_trials):

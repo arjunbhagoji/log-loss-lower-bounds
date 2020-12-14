@@ -30,7 +30,7 @@ class MaximumFlowResult:
         return 'MaximumFlowResult with value of %d' % self.flow_value 
 
 
-def maximum_flow(csgraph, source, sink):
+def maximum_flow_custom(csgraph, source, sink):
     r"""
     maximum_flow(csgraph, source, sink)
 

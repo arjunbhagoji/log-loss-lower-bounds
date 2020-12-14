@@ -132,15 +132,24 @@ def pgd_l2_attack(model, image_tensor, img_variable, tar_label_variable,
             raw_grad = img_variable.grad.data
             grad_norm = torch.max(
                    raw_grad.view(raw_grad.size(0), -1).norm(2, 1), torch.tensor(1e-9).cuda())
-            grad_dir = raw_grad/grad_norm.view(raw_grad.size(0),1,1,1)
+            if len(img_variable.size())==2:
+                grad_dir = raw_grad/grad_norm.view(raw_grad.size(0),1)
+            else:
+                grad_dir = raw_grad/grad_norm.view(raw_grad.size(0),1,1,1)
             adv_temp = img_variable.data +  -1 * eps_step * grad_dir
             # Clipping total perturbation
             total_grad = adv_temp - image_tensor
             total_grad_norm = torch.max(
                    total_grad.view(total_grad.size(0), -1).norm(2, 1), torch.tensor(1e-9).cuda())
-            total_grad_dir = total_grad/total_grad_norm.view(total_grad.size(0),1,1,1)
+            if len(img_variable.size())==2:
+                total_grad_dir = total_grad/total_grad_norm.view(total_grad.size(0),1)
+            else:
+                total_grad_dir = total_grad/total_grad_norm.view(total_grad.size(0),1,1,1)
             total_grad_norm_rescale = torch.min(total_grad_norm, torch.tensor(eps_max).cuda())
-            clipped_grad = total_grad_norm_rescale.view(total_grad.size(0),1,1,1) * total_grad_dir
+            if len(img_variable.size())==2:
+                clipped_grad = total_grad_norm_rescale.view(total_grad.size(0),1) * total_grad_dir
+            else:
+                clipped_grad = total_grad_norm_rescale.view(total_grad.size(0),1,1,1) * total_grad_dir
             x_adv = image_tensor + clipped_grad
             x_adv = torch.clamp(x_adv, clip_min, clip_max)
             img_variable.data = x_adv

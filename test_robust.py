@@ -173,7 +173,7 @@ if __name__ == '__main__':
     parser.add_argument('--degree_path', type=str, default='graph_data/degree_results')
     parser.add_argument("--norm", default='l2', help="norm to be used")
     parser.add_argument('--drop_thresh', type=int, default=100)
-    parser.add_argument('--drop_eps',type=float, default=None)
+    parser.add_argument('--drop_eps',type=float, default=0.0)
     parser.add_argument('--curriculum', type=str, default='all')
     parser.add_argument('--loss_fn', type=str, default='CE')
 
@@ -209,7 +209,12 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    args.checkpoint_path = 'data/abhagoji/models'
+    if args.num_samples is None:
+        args.num_samples = 'All'
+    if args.drop_eps==0:
+        args.drop_eps=args.epsilon
+
+    args.checkpoint_path = 'trained_models'
 
 
     acc_train_list = []
