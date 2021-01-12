@@ -90,11 +90,21 @@ def robust_train_one_epoch(model, optimizer, loader_train, args, eps,
         y = y.cuda()
         if args.loss_fn == 'trades':
           loss, loss_ben, loss_adv = trades_loss(model, x, y, optimizer, delta, eps, 
+                                      args.attack_iter, args.gamma, beta=args.beta, distance=args.attack)
+          losses.append(loss_adv.data.cpu().numpy())
+          losses_ben.append(loss_ben.data.cpu().numpy())
+        elif args.loss_fn == 'KL_emp':
+          _, loss_ben, loss_adv = trades_loss(model, x, y, optimizer, delta, eps, 
                                       args.attack_iter, args.gamma, beta=1.0, distance=args.attack)
           losses.append(loss_adv.data.cpu().numpy())
           losses_ben.append(loss_ben.data.cpu().numpy())
+          loss = loss_adv
         else:  
           x_mod = None
+          if 'KL' in args.loss_fn:
+              optimal_scores = torch.from_numpy(optimal_scores_overall[idx]).float().cuda()
+          else:
+            optimal_scores = None
           if 'hybrid' in args.attack:
             # Find matched and unmatched data and labels
             unmatched_x = x[ez]
@@ -124,7 +134,7 @@ def robust_train_one_epoch(model, optimizer, loader_train, args, eps,
               adv_x = pgd_l2_attack(model, x, x_var, y_target, args.attack_iter,
                              eps, delta, args.clip_min, args.clip_max, 
                              args.targeted, args.rand_init,
-                             args.num_restarts, x_mod, ez)
+                             args.num_restarts, x_mod, ez, args.attack_loss, optimal_scores)
           if 'hybrid' in args.attack:
             x = torch.cat((unmatched_x,matched_x))
             y = torch.cat((unmatched_y,matched_y))
@@ -133,20 +143,28 @@ def robust_train_one_epoch(model, optimizer, loader_train, args, eps,
               x_mod = hybrid_attack(matched_x, ez, m, rel_data, args.new_epsilon)
               adv_x = torch.cat((adv_x, x_mod))
           scores = model(adv_x)
+          ben_loss_function = nn.CrossEntropyLoss(reduction='none')
+          batch_loss_ben = ben_loss_function(model(x),y_var)
           if args.loss_fn == 'CE':
             loss_function = nn.CrossEntropyLoss(reduction='none')
             batch_loss_adv = loss_function(scores, y_var)
-            batch_loss_ben = loss_function(model(x),y_var)
+            loss = torch.mean(batch_loss_adv)
           elif args.loss_fn == 'KL':
-            optimal_scores = torch.from_numpy(optimal_scores_overall[idx]).float().cuda()
+            # optimal_scores = torch.from_numpy(optimal_scores_overall[idx]).float().cuda()
             loss_function = nn.KLDivLoss(reduction='none')
             batch_loss_adv = loss_function(scores, optimal_scores)
-            batch_loss_ben = loss_function(model(x), optimal_scores)
+            loss = torch.mean(batch_loss_adv)
+            # print(loss.shape)
           elif args.loss_fn == 'KL_flat':
-            optimal_scores = torch.from_numpy(optimal_scores_overall[idx]).float().cuda()
+            # optimal_scores = torch.from_numpy(optimal_scores_overall[idx]).float().cuda()
             batch_loss_adv = KL_loss_flat(scores, optimal_scores, y_var, t)
-            batch_loss_ben = KL_loss_flat(model(x), optimal_scores, y_var, t)
-          loss = torch.mean(batch_loss_adv)
+            loss = torch.mean(batch_loss_adv)
+          elif args.loss_fn == 'trades_opt':
+            adv_loss_function = nn.KLDivLoss(reduction='none')
+            ben_loss_function = nn.CrossEntropyLoss(reduction='none')
+            batch_loss_adv = adv_loss_function(scores, optimal_scores)
+            batch_loss_ben = ben_loss_function(model(x), optimal_scores)
+            loss = torch.mean(batch_loss_ben+batch_loss_adv)
           loss_ben = torch.mean(batch_loss_ben)
           losses_ben.append(loss_ben.data.cpu().numpy())
           losses.append(loss.data.cpu().numpy())

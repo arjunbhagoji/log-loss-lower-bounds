@@ -34,9 +34,14 @@ def track_best(blosses, b_adv_x, curr_losses, curr_adv_x):
     return blosses, b_adv_x
 
 
-def cal_loss(y_out, y_true, targeted):
-    losses = torch.nn.CrossEntropyLoss(reduction='none')
-    losses_cal = losses(y_out, y_true)
+def cal_loss(y_out, y_true, targeted, loss_function, optimal_scores):
+    if loss_function == 'CE':
+        losses = torch.nn.CrossEntropyLoss(reduction='none')
+        losses_cal = losses(y_out, y_true)
+    elif loss_function == 'KL':
+        losses = torch.nn.KLDivLoss(reduction='none')
+        losses_cal = losses(y_out, optimal_scores)
+        losses_cal = torch.sum(losses_cal,dim=1)
     loss_cal = torch.mean(losses_cal)
     if targeted:
         return loss_cal, losses_cal
@@ -91,7 +96,8 @@ def pgd_attack(model, image_tensor, img_variable, tar_label_variable,
 
 def pgd_l2_attack(model, image_tensor, img_variable, tar_label_variable,
                n_steps, eps_max, eps_step, clip_min, clip_max, targeted, 
-               rand_init, num_restarts, image_tensor_mod=None, unmod_indices=None):
+               rand_init, num_restarts, image_tensor_mod=None, unmod_indices=None, 
+               loss_function='CE', optimal_scores=None):
     """
     image_tensor: tensor which holds the clean images. 
     img_variable: Corresponding pytorch variable for image_tensor.
@@ -126,7 +132,8 @@ def pgd_l2_attack(model, image_tensor, img_variable, tar_label_variable,
         for i in range(n_steps):
             zero_gradients(img_variable)
             output = model.forward(img_variable)
-            loss_cal, losses_cal = cal_loss(output, tar_label_variable, targeted)
+            loss_cal, losses_cal = cal_loss(output, tar_label_variable, targeted, 
+                                            loss_function,optimal_scores)
             best_losses, best_adv_x = track_best(best_losses, best_adv_x, losses_cal, img_variable)
             loss_cal.backward()
             raw_grad = img_variable.grad.data

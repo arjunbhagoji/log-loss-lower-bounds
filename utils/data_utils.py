@@ -73,15 +73,14 @@ def load_cifar_dataset(args, data_dir, training_time):
                                     transforms.RandomHorizontalFlip(),
                                     transforms.RandomCrop(32, 4),
                                     transforms.ToTensor()
-                                ]), training_time=training_time)
+                                ]))
     loader_train = torch.utils.data.DataLoader(trainset, 
                                 batch_size=args.batch_size,
                                 shuffle=True)
 
     testset = datasets.CIFAR10(root=data_dir,
                                 train=True,
-                                download=False, transform=transforms.ToTensor(),
-                                training_time=training_time)
+                                download=False, transform=transforms.ToTensor())
     loader_test = torch.utils.data.DataLoader(testset, 
                                 batch_size=args.test_batch_size,
                                 shuffle=False)

@@ -108,7 +108,10 @@ class cifar10(VisionDataset):
 
         self._load_meta()
 
-        self.data, self.targets, num_samples = self._two_c_filter(args)
+        if args.n_classes == 2:
+            self.data, self.targets, num_samples = self._two_c_filter(args)
+        elif args.n_classes == 10:
+            num_samples = len(self.data)
 
         self.dropping = dropping
 

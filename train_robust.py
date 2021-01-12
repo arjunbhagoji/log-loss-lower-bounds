@@ -13,7 +13,7 @@ import numpy as np
 import time
 import argparse
 from torchsummary import summary
-# from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 
 from utils.mnist_models import cnn_3l, cnn_3l_bn, lenet5
 # from utils.cifar10_models import WideResNet
@@ -29,8 +29,8 @@ def main(trial_num):
     args.trial_num = trial_num
     print(args.curriculum)
     model_dir_name, log_dir_name, figure_dir_name, training_output_dir_name = init_dirs(args, train=True)
-    # if args.save_checkpoint:
-    #     writer = SummaryWriter(log_dir=log_dir_name)
+    if args.save_checkpoint:
+        writer = SummaryWriter(log_dir=log_dir_name)
     print('Training %s' % model_dir_name)
 
     if torch.cuda.is_available():
@@ -40,12 +40,12 @@ def main(trial_num):
 
     training_time = True
     
-    if args.n_classes != 10:
-        loader_train, loader_test, data_details = load_dataset_custom(args, data_dir='data', training_time=training_time)
-        args.dropping = False
-        loader_train_all, _, _ = load_dataset_custom(args, data_dir='data', training_time=training_time)
-    else:
-        loader_train, loader_test, data_details = load_dataset(args, data_dir='data', training_time=training_time)
+    # if args.n_classes != 10:
+    loader_train, loader_test, data_details = load_dataset_custom(args, data_dir='data', training_time=training_time)
+    args.dropping = False
+    loader_train_all, _, _ = load_dataset_custom(args, data_dir='data', training_time=training_time)
+    # else:
+    #     loader_train, loader_test, data_details = load_dataset(args, data_dir='data', training_time=training_time)
 
     num_channels = data_details['n_channels']
 
@@ -98,7 +98,6 @@ def main(trial_num):
         net.load_state_dict(torch.load(model_dir_name + ckpt_path))
         robust_test_during_train(net, loader_test, args, n_batches=10)
 
-    criterion = nn.CrossEntropyLoss(reduction='none') 
     # criterion = nn.CrossEntropyLoss()
 
     optimizer = torch.optim.SGD(net.parameters(),
@@ -121,6 +120,8 @@ def main(trial_num):
     early_stop_counter = 0
     # early_stop_thresh = 0.05
     best_loss_adv = 100.0
+    # Loss function for validation
+    test_criterion = nn.CrossEntropyLoss(reduction='none') 
 
     for epoch in range(args.curr_epoch, args.train_epochs):
         start_time = time.time()
@@ -151,38 +152,35 @@ def main(trial_num):
         print('Test set validation')
         # Running validation
         acc_test, acc_adv_test, test_loss, test_loss_adv, _ = f_eval(net, 
-            criterion, loader_test, args, attack_params, epoch, training_output_dir_name, 
+            test_criterion, loader_test, args, attack_params, epoch, training_output_dir_name, 
             None,n_batches=n_batches_eval, train_data=False, training_time=True) 
         print('Training set validation')
         acc_train, acc_adv_train, train_loss, train_loss_adv, _ = f_eval(net, 
-            criterion, loader_train_all, args, attack_params, epoch, training_output_dir_name, 
+            test_criterion, loader_train_all, args, attack_params, epoch, training_output_dir_name, 
             None, n_batches=n_batches_eval, train_data=True, training_time=True)
-        # if epoch>0:
-        #     train_loss_diff = abs(train_loss_adv-train_loss_adv_prev)
-        #     print('Train loss difference: %s' % train_loss_diff)
-        #     if train_loss_diff<early_stop_thresh:
-        #         early_stop_counter += 1
-        #     else:
-        #         early_stop_counter = 0
-        # train_loss_adv_prev = train_loss_adv
+
         if args.save_checkpoint:
             ckpt_path = 'checkpoint_' + str(args.last_epoch)
             torch.save(net.state_dict(), model_dir_name + ckpt_path)
             if train_loss_adv<best_loss_adv and epoch>0:
-                ckpt_path_best = 'checkpoint_' + str(epoch)
+                ckpt_path_best = 'checkpoint_' + str(1)
                 torch.save(net.state_dict(), model_dir_name + ckpt_path_best)
                 best_loss_adv = train_loss_adv
-            # writer.add_scalar('Loss/train_adv', train_loss_adv, epoch)
-            # writer.add_scalar('Loss/test_ben', test_loss, epoch)
-            # writer.add_scalar('Loss/test_adv', test_loss_adv, epoch)
-            # writer.add_scalar('Acc/test_ben', acc_test, epoch)
-            # writer.add_scalar('Acc/test_adv', acc_adv_test, epoch)
-            # writer.add_scalar('Lr', lr, epoch)
-            # if args.is_adv:
-            #     writer.add_scalar('Loss/train_ben', train_loss, epoch)
-            # else:
-            #     writer.add_scalar('Loss/train_ben', 0, epoch)
-        #To-do: track KL loss
+            writer.add_scalar('CE_Loss/train_adv', train_loss_adv, epoch)
+            writer.add_scalar('CE_Loss/test_ben', test_loss, epoch)
+            writer.add_scalar('CE_Loss/test_adv', test_loss_adv, epoch)
+            writer.add_scalar('Acc/test_ben', acc_test, epoch)
+            writer.add_scalar('Acc/test_adv', acc_adv_test, epoch)
+            writer.add_scalar('Lr', lr, epoch)
+            if args.is_adv:
+                writer.add_scalar('CE_Loss/train_ben', train_loss, epoch)
+                if args.loss_fn != 'CE':
+                    writer.add_scalar('%s_Loss/train_ben' % args.loss_fn, ben_loss, epoch)
+                    writer.add_scalar('%s_Loss/train_adv' % args.loss_fn, curr_loss, epoch)
+            else:
+                writer.add_scalar('CE_Loss/train_ben', 0, epoch)
+                if args.loss_fn != 'CE':
+                   writer.add_scalar('%s_Loss/train_ben' % args.loss_fn, ben_loss, epoch) 
         print('Train loss - Adv: %s Ben: %s; Test loss - Adv: %s; Ben: %s' %
             (train_loss_adv, train_loss, test_loss_adv, test_loss))
         scheduler.step()
@@ -198,7 +196,7 @@ if __name__ == '__main__':
     # Data args
     parser.add_argument('--dataset_in', type=str, default='MNIST')
     parser.add_argument('--n_classes', type=int, default=2)
-    parser.add_argument('--num_samples', type=int, default=4000)
+    parser.add_argument('--num_samples', type=int, default=2000)
 
     # Model args
     parser.add_argument('--model', type=str, default='cnn_3l', choices=['resnet','cnn_3l', 'cnn_3l_bn', 'dn', 'lenet5'])
@@ -217,6 +215,7 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=2e-4)
     parser.add_argument('--curriculum', type=str, default='all')
     parser.add_argument('--loss_fn', type=str, default='CE')
+    parser.add_argument('--attack_loss', type=str, default='CE')
 
     # Attack args
     parser.add_argument('--is_adv', dest='is_adv', action='store_true')
@@ -253,6 +252,8 @@ if __name__ == '__main__':
         args.num_samples = 'All'
     if args.drop_eps==0:
         args.drop_eps=args.epsilon
+    if args.loss_fn == 'trades':
+        args.beta = 6.0
 
     args.eps_step = args.epsilon*args.gamma/args.attack_iter
     attack_params = {'attack': args.attack, 'epsilon': args.epsilon, 

@@ -13,6 +13,7 @@ import time
 import argparse
 from torchsummary import summary
 
+
 from utils.mnist_models import cnn_3l, cnn_3l_bn
 from utils.resnet_cifar import resnet
 from utils.cifar10_models import WideResNet
@@ -31,12 +32,12 @@ def main(trial_num):
 
     training_time = False
 
-    if args.n_classes != 10:
-        loader_train, loader_test, data_details = load_dataset_custom(
-            args, data_dir='data', training_time=training_time)
-    else:
-        loader_train, loader_test, data_details = load_dataset(
-            args, data_dir='data', training_time=training_time)
+    # if args.n_classes != 10:
+    loader_train, loader_test, data_details = load_dataset_custom(
+        args, data_dir='data', training_time=training_time)
+    # else:
+    #     loader_train, loader_test, data_details = load_dataset(
+    #         args, data_dir='data', training_time=training_time)
 
     num_channels = data_details['n_channels']
 
@@ -82,6 +83,8 @@ def main(trial_num):
     net.eval()
     ckpt_path = 'checkpoint_' + str(args.last_epoch)
     net.load_state_dict(torch.load(model_dir_name + ckpt_path))
+
+
     if 'hybrid' in args.new_attack:
         print('Using attack {}'.format(args.new_attack))
         f_eval = robust_test_hybrid
@@ -109,7 +112,7 @@ def main(trial_num):
         all_probs_test[k]=prob_dict_test[str(k)]
 
     # printing out loss
-    print('Train loss adv:%s' % loss_train_adv)
+    print('Robust train: %s, Robust Test: %s, Train loss adv:%s' % (acc_train_adv, acc_test_adv, loss_train_adv))
     # Saving test output
     test_output_fname = test_file_save_name(args, model_name)
     print(test_output_fname)
@@ -118,11 +121,12 @@ def main(trial_num):
     acc_test_list.append(acc_test)
     acc_test_adv_list.append(acc_test_adv)
 
-    probs_output_fname = test_probs_save_name(args,model_name)
-    np.savetxt(probs_output_fname + '_train_tr%s.txt' % (args.trial_num) ,all_probs_train, fmt='%.5f')
-    np.savetxt(probs_output_fname + '_test_tr%s.txt' % (args.trial_num),all_probs_test, fmt='%.5f')
-
+ 
     if args.save_test:
+        probs_output_fname = test_probs_save_name(args,model_name)
+        np.savetxt(probs_output_fname + '_train_tr%s.txt' % (args.trial_num) ,all_probs_train, fmt='%.5f')
+        np.savetxt(probs_output_fname + '_test_tr%s.txt' % (args.trial_num),all_probs_test, fmt='%.5f')
+
         f = open(test_output_fname, mode='a')
         if args.trial_num == 1:
             f.write('tr, ben_tr, adv_tr, ben_te, adv_te \n')
@@ -159,7 +163,7 @@ if __name__ == '__main__':
     # Defense args
     parser.add_argument('--is_adv', dest='is_adv', action='store_true')
     parser.add_argument('--attack', type=str, default='PGD_l2',
-                        choices=['PGD_l2', 'PGD_linf', 'PGD_l2_hybrid_seed', 'PGD_l2_hybrid_replace'])
+                        choices=['PGD_l2', 'PGD_linf', 'PGD_l2_hybrid_seed', 'PGD_l2_hybrid_replace','AA_l2'])
     parser.add_argument('--epsilon', type=float, default=8.0)
     parser.add_argument('--attack_iter', type=int, default=10)
     parser.add_argument('--gamma', type=float, default=1.0)
@@ -176,10 +180,12 @@ if __name__ == '__main__':
     parser.add_argument('--drop_eps',type=float, default=0.0)
     parser.add_argument('--curriculum', type=str, default='all')
     parser.add_argument('--loss_fn', type=str, default='CE')
+    parser.add_argument('--attack_loss', type=str, default='CE')
 
     # Attack args
+    parser.add_argument('--new_attack_loss', type=str, default='CE')
     parser.add_argument('--new_attack', type=str, default='PGD_l2',
-                        choices=['PGD_l2', 'PGD_linf', 'PGD_l2_hybrid_seed', 'PGD_l2_hybrid_replace'])
+                        choices=['PGD_l2', 'PGD_linf', 'PGD_l2_hybrid_seed', 'PGD_l2_hybrid_replace', 'AA_l2'])
     parser.add_argument('--new_epsilon', type=float, default=2.0)
     parser.add_argument('--new_attack_iter', type=int, default=20)
     parser.add_argument('--new_gamma', type=float, default=1.0)
@@ -213,8 +219,11 @@ if __name__ == '__main__':
         args.num_samples = 'All'
     if args.drop_eps==0:
         args.drop_eps=args.epsilon
+    if args.loss_fn == 'trades':
+        args.beta = 6.0
 
     args.checkpoint_path = 'trained_models'
+    args.last_epoch = 0
 
 
     acc_train_list = []
@@ -224,7 +233,7 @@ if __name__ == '__main__':
 
     args.eps_step = args.epsilon*args.gamma/args.attack_iter
     args.new_eps_step = args.new_epsilon*args.gamma/args.new_attack_iter
-    attack_params = {'attack': args.new_attack, 'epsilon': args.new_epsilon, 
+    attack_params = {'attack_loss': args.new_attack_loss,'attack': args.new_attack, 'epsilon': args.new_epsilon, 
                  'attack_iter': args.new_attack_iter, 'eps_step': args.new_eps_step,
                  'targeted': args.targeted, 'clip_min': args.clip_min,
                  'clip_max': args.clip_max,'rand_init': args.new_rand_init, 

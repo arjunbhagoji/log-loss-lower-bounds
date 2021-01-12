@@ -79,10 +79,15 @@ def model_naming(args):
 			model_name += '-conv' + str(args.conv_expand) + '-fc' + str(args.fc_expand) 
 	if args.loss_fn != 'CE':
 		model_name += '_' + args.loss_fn
+	if args.loss_fn == 'trades':
+		if args.beta != 1.0:
+			model_name += 'B' + str(args.beta)
 	if args.lr_schedule != 'linear0':
 		model_name += '_lr-sch' + str(args.lr_schedule)
 	if args.learning_rate != 0.1:
 		model_name += '_lr' + str(args.learning_rate)
+	if args.attack_loss != args.loss_fn:
+		model_name += '_al-' + str(args.attack_loss)
 	if args.attack != 'PGD_l2' and args.attack != 'PGD_linf':
 		model_name += '_' + str(args.attack)
 		if args.marking_strat != 'matched':
@@ -125,6 +130,8 @@ def model_naming_no_eps(args):
 		model_name += '_lr-sch' + str(args.lr_schedule)
 	if args.learning_rate != 0.1:
 		model_name += '_lr' + str(args.learning_rate)
+	if args.attack_loss != args.loss_fn:
+		model_name += '_al-' + str(args.attack_loss)
 	if args.attack != 'PGD_l2' and args.attack != 'PGD_linf':
 		model_name += '_' + str(args.attack)
 		if args.marking_strat != 'matched':

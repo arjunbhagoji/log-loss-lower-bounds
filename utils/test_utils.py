@@ -10,10 +10,30 @@ from scipy.special import softmax
 import collections
 import json 
 
+from autoattack import AutoAttack
+
 from .attack_utils import cal_loss, generate_target_label_tensor, pgd_attack, pgd_l2_attack, hybrid_attack
 from .image_utils import custom_save_image
 from .data_utils import load_dataset_tensor
 
+def compute_scores_and_losses(model,loss_fn,x,y,adv_x):
+  num_correct, num_correct_adv, num_samples = 0, 0, 0
+  y=y.cuda()
+  scores = model(x.cuda()) 
+  _, preds = scores.data.max(1)
+  scores_adv = model(adv_x.cuda())
+  _, preds_adv = scores_adv.data.max(1)
+  # Losses
+  batch_loss_adv = loss_fn(scores_adv, y)
+  loss_adv = torch.mean(batch_loss_adv)
+  batch_loss_ben = loss_fn(scores, y)
+  loss_ben = torch.mean(batch_loss_ben)
+  # Correct count
+  num_correct += (preds == y).sum()
+  num_correct_adv += (preds_adv == y).sum()
+  num_samples += len(preds)
+
+  return loss_adv, loss_ben, num_correct, num_correct_adv, num_samples, scores_adv
 
 def hard_point_class_count(pred_dict):
   count_one_wrong = 0
@@ -146,7 +166,7 @@ def robust_test_hybrid(model, loss_fn, loader, args, att_dir, epoch=0, training_
             adv_x = pgd_l2_attack(model, x, x_var, y_target, att_dir['attack_iter'],
                            att_dir['epsilon'], att_dir['eps_step'], att_dir['clip_min'],
                            att_dir['clip_max'], att_dir['targeted'], att_dir['rand_init'], 
-                           att_dir['num_restarts'], x_mod, ez)
+                           att_dir['num_restarts'], x_mod, ez, 'CE', optimal_scores)
       x = torch.cat((unmatched_x,matched_x))
       y = torch.cat((unmatched_y,matched_y))
       if 'replace' in att_dir['attack']:
@@ -255,75 +275,101 @@ def robust_test(model, loss_fn, loader, args, att_dir, epoch=0, training_output_
         f = open(f_name,'a+')
         loss_dict['epoch'] = epoch
 
-    for t, (x, y, idx, ez, m) in enumerate(loader):
-        x = x.cuda()
-        y = y.cuda()
-        x_var = Variable(x, requires_grad= True)
-        y_var = Variable(y, requires_grad=False)
-        if att_dir['targeted']:
-            y_target = generate_target_label_tensor(
-                               y_var.cpu(), args).cuda()
-        else:
-            y_target = y_var
-        if 'PGD_linf' in att_dir['attack']:
-            adv_x = pgd_attack(model, x, x_var, y_target, att_dir['attack_iter'],
-                           att_dir['epsilon'], att_dir['eps_step'], att_dir['clip_min'],
-                           att_dir['clip_max'], att_dir['targeted'], att_dir['rand_init'])
-        elif 'PGD_l2' in att_dir['attack']:
-            adv_x = pgd_l2_attack(model, x, x_var, y_target, att_dir['attack_iter'],
-                           att_dir['epsilon'], att_dir['eps_step'], att_dir['clip_min'],
-                           att_dir['clip_max'], att_dir['targeted'], att_dir['rand_init'], 
-                           att_dir['num_restarts'])
-        # Predictions
-        scores = model(x.cuda()) 
-        _, preds = scores.data.max(1)
-        scores_adv = model(adv_x)
-        _, preds_adv = scores_adv.data.max(1)
-        # Losses
-        batch_loss_adv = loss_fn(scores_adv, y)
-        loss_adv = torch.mean(batch_loss_adv)
-        losses_adv.append(loss_adv.data.cpu().numpy())
-        batch_loss_ben = loss_fn(scores, y)
-        loss_ben = torch.mean(batch_loss_ben)
-        losses_ben.append(loss_ben.data.cpu().numpy())
-        # Correct count
-        num_correct += (preds == y).sum()
-#         print(preds)
-#         print(preds_adv)
-        num_correct_adv += (preds_adv == y).sum()
-        num_samples += len(preds)
-        # Adding probs to dict
-        count=0
-        for i in idx.numpy():
-          score_curr = scores_adv[count].cpu().detach().numpy()
-          prob_dict[str(i)] = softmax(score_curr)
-          # print(count)
-          count+=1
+    if 'PGD' in att_dir['attack']:
+      for t, (x, y, idx, ez, m) in enumerate(loader):
+          x = x.cuda()
+          y = y.cuda()
+          x_var = Variable(x, requires_grad= True)
+          y_var = Variable(y, requires_grad=False)
+          if att_dir['targeted']:
+              y_target = generate_target_label_tensor(
+                                 y_var.cpu(), args).cuda()
+          else:
+              y_target = y_var
+          if 'PGD_linf' in att_dir['attack']:
+              adv_x = pgd_attack(model, x, x_var, y_target, att_dir['attack_iter'],
+                             att_dir['epsilon'], att_dir['eps_step'], att_dir['clip_min'],
+                             att_dir['clip_max'], att_dir['targeted'], att_dir['rand_init'])
+          elif 'PGD_l2' in att_dir['attack']:
+              adv_x = pgd_l2_attack(model, x, x_var, y_target, att_dir['attack_iter'],
+                             att_dir['epsilon'], att_dir['eps_step'], att_dir['clip_min'],
+                             att_dir['clip_max'], att_dir['targeted'], att_dir['rand_init'], 
+                             att_dir['num_restarts'])
 
-        if args.track_hard:
-          idx_matched = idx[~ez].numpy()
-          m_matched = m[~ez].numpy()
-          preds_adv_matched = preds_adv[~ez].cpu().numpy()
-          loss_adv_matched = batch_loss_adv[~ez].cpu().detach().numpy()
-          y_np_matched = y[~ez].cpu().numpy()
-          ez_np = ez.data.cpu().numpy()
+          # Predictions
+          scores = model(x.cuda()) 
+          _, preds = scores.data.max(1)
+          scores_adv = model(adv_x)
+          _, preds_adv = scores_adv.data.max(1)
+          # Losses
+          batch_loss_adv = loss_fn(scores_adv, y)
+          loss_adv = torch.mean(batch_loss_adv)
+          losses_adv.append(loss_adv.data.cpu().numpy())
+          batch_loss_ben = loss_fn(scores, y)
+          loss_ben = torch.mean(batch_loss_ben)
+          losses_ben.append(loss_ben.data.cpu().numpy())
+          # Correct count
+          num_correct += (preds == y).sum()
+          num_correct_adv += (preds_adv == y).sum()
+          num_samples += len(preds)
+          # Adding probs to dict
+          count=0
+          for i in idx.numpy():
+            score_curr = scores_adv[count].cpu().detach().numpy()
+            prob_dict[str(i)] = softmax(score_curr)
+            # print(count)
+            count+=1
 
-          for i in range(len(y_np_matched)):
-            pred_dict[str(idx_matched[i])] = [m_matched[i],y_np_matched[i],preds_adv_matched[i]]
+          if args.track_hard:
+            idx_matched = idx[~ez].numpy()
+            m_matched = m[~ez].numpy()
+            preds_adv_matched = preds_adv[~ez].cpu().numpy()
+            loss_adv_matched = batch_loss_adv[~ez].cpu().detach().numpy()
+            y_np_matched = y[~ez].cpu().numpy()
+            ez_np = ez.data.cpu().numpy()
 
-          loss_dict = track_hard_losses(ez_np, batch_loss_adv, batch_loss_ben, 
-                              loss_dict, t)
+            for i in range(len(y_np_matched)):
+              pred_dict[str(idx_matched[i])] = [m_matched[i],y_np_matched[i],preds_adv_matched[i]]
+
+            loss_dict = track_hard_losses(ez_np, batch_loss_adv, batch_loss_ben, 
+                                loss_dict, t)
+          
+          if not training_time:
+            if args.viz and steps == 1:
+                if not os.path.exists(figure_dir_name):
+                  os.makedirs(figure_dir_name)
+                custom_save_image(adv_x, preds_adv, y, args, figure_dir_name, 
+                                  train_data)
+          
+          if n_batches > 0 and steps==n_batches:
+              break
+          steps += 1
+    elif 'AA' in att_dir['attack']:
+      x_test = []
+      y_test = []
+      idx_all = []
+      for t, (x, y, idx, ez, m) in enumerate(loader): 
+        x_test.append(x)
+        y_test.append(y)
+        idx_all.extend(idx.numpy())
+      x_test = torch.cat(x_test, 0)
+      y_test = torch.cat(y_test, 0)
+      print(x_test.size())
+      print(y_test.size())
+      adversary = AutoAttack(model, norm='L2', eps=att_dir['epsilon'], version='standard')
+      adversary.attacks_to_run = ['apgd-ce','fab']
+      adv_x = adversary.run_standard_evaluation(x_test, y_test)
+      loss_adv, loss_ben, num_correct, num_correct_adv, num_samples, scores_adv = compute_scores_and_losses(model,loss_fn,x_test,y_test,adv_x)
+      losses_adv.append(loss_adv.data.cpu().numpy())
+      losses_ben.append(loss_ben.data.cpu().numpy())
         
-        if not training_time:
-          if args.viz and steps == 1:
-              if not os.path.exists(figure_dir_name):
-                os.makedirs(figure_dir_name)
-              custom_save_image(adv_x, preds_adv, y, args, figure_dir_name, 
-                                train_data)
-        
-        if n_batches > 0 and steps==n_batches:
-            break
-        steps += 1
+      # Adding probs to dict
+      count=0
+      for i in idx_all:
+        score_curr = scores_adv[count].cpu().detach().numpy()
+        prob_dict[str(i)] = softmax(score_curr)
+        # print(count)
+        count+=1
 
     acc = float(num_correct) / num_samples
     acc_adv = float(num_correct_adv) / num_samples
