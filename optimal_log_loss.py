@@ -212,18 +212,21 @@ parser.add_argument("--dataset_in", default='MNIST',
                     help="dataset to be used")
 parser.add_argument("--norm", default='l2',
                     help="norm to be used")
-parser.add_argument('--num_samples', type=int, default=None)
+parser.add_argument('--num_samples', type=int, default=5000)
 parser.add_argument('--n_classes', type=int, default=2)
-parser.add_argument('--eps', type=float, default=None)
-parser.add_argument('--approx_only', dest='approx_only', action='store_true')
+parser.add_argument('--eps', type=float, default=1.0)
 parser.add_argument('--use_test', dest='use_test', action='store_true')
-parser.add_argument('--track_hard', dest='track_hard', action='store_true')
 parser.add_argument('--use_full', dest='use_full', action='store_true')
 parser.add_argument('--run_generic', dest='run_generic', action='store_true')
-parser.add_argument('--new_marking_strat', type=str, default=None)
 parser.add_argument('--num_reps', type=int, default=2)
 
 args = parser.parse_args()
+
+if args.n_classes == 2:
+    args.class_1 = 3
+    args.class_2 = 7
+else:
+    raise ValueError('Unsupported number of classes')
 
 train_data, test_data, data_details = load_dataset_numpy(args, data_dir='data',
                                                         training_time=False)
@@ -234,11 +237,11 @@ Y = []
 
 # Pytorch normalizes tensors (so need manual here!)
 if args.use_test:
-    for (x,y,_, _, _) in test_data:
+    for (x,y,_) in test_data:
         X.append(x/255.)
         Y.append(y)
 else:
-    for (x,y,_, _, _) in train_data:
+    for (x,y,_) in train_data:
         X.append(x/255.)
         Y.append(y)
 
@@ -251,8 +254,6 @@ print(num_samples)
 X_c1 = X[:num_samples].reshape(num_samples, DATA_DIM)
 X_c2 = X[num_samples:].reshape(num_samples, DATA_DIM)
 
-class_1 = 3
-class_2 = 7
 
 if not os.path.exists('distances'):
     os.makedirs('distances')
@@ -270,9 +271,9 @@ rng = np.random.default_rng(77)
 
 for subsample_size in subsample_sizes:
     if args.use_test:
-        save_file_name = 'logloss_' + str(class_1) + '_' + str(class_2) + '_' + str(subsample_size) + '_' + args.dataset_in + '_test_' + args.norm
+        save_file_name = 'logloss_' + str(args.class_1) + '_' + str(args.class_2) + '_' + str(subsample_size) + '_' + args.dataset_in + '_test_' + args.norm
     else:
-        save_file_name = 'logloss_' + str(class_1) + '_' + str(class_2) + '_' + str(subsample_size) + '_' + args.dataset_in + '_' + args.norm
+        save_file_name = 'logloss_' + str(args.class_1) + '_' + str(args.class_2) + '_' + str(subsample_size) + '_' + args.dataset_in + '_' + args.norm
 
     f = open('cost_results/' + save_file_name + '.txt', 'a')
     f_time = open('cost_results/timing_results/' + save_file_name + '.txt', 'a')
@@ -296,9 +297,9 @@ for subsample_size in subsample_sizes:
             X_c2_curr = X_c2[indices_2]
 
         if args.use_test:
-            dist_mat_name = args.dataset_in + '_test_' + str(class_1) + '_' + str(class_2) + '_' + str(subsample_size) + '_' + args.norm + '_rep' + str(rep) + '.npy'
+            dist_mat_name = args.dataset_in + '_test_' + str(args.class_1) + '_' + str(args.class_2) + '_' + str(subsample_size) + '_' + args.norm + '_rep' + str(rep) + '.npy'
         else:
-            dist_mat_name = args.dataset_in + '_' + str(class_1) + '_' + str(class_2) + '_' + str(subsample_size) + '_' + args.norm + '_rep' + str(rep) + '.npy'
+            dist_mat_name = args.dataset_in + '_' + str(args.class_1) + '_' + str(args.class_2) + '_' + str(subsample_size) + '_' + args.norm + '_rep' + str(rep) + '.npy'
 
         if os.path.exists(dist_mat_name):
             print('Loading distances')
@@ -398,7 +399,8 @@ for subsample_size in subsample_sizes:
     if args.run_generic:
         time_avg_generic=np.mean(time_generic_list)
         time_var_generic=np.var(time_generic_list)
-        f_time.write(str(eps)+','+ str(time_avg)+','+str(time_var)+','+ str(time_avg_generic)+','+str(time_var_generic)+','+str(num_edges_avg)+'\n')
+        # f_time.write(str(eps)+','+ str(time_avg)+','+str(time_var)+','+ str(time_avg_generic)+','+str(time_var_generic)+','+str(num_edges_avg)+'\n')
     else:
-        f_time.write(str(eps)+','+ str(time_avg)+','+str(time_var)+','+str(num_edges_avg)+'\n')
+        a=1
+        # f_time.write(str(eps)+','+ str(time_avg)+','+str(time_var)+','+str(num_edges_avg)+'\n')
     np.savetxt('graph_data/optimal_probs/' + save_file_name + '_' + str(eps) + '.txt', classifier_probs, fmt='%.5f')
