@@ -232,7 +232,7 @@ def log_empirical_cost(X_1,X_2,eps):
     
     return classifier_probs, loss
 
-d_list = [2,10]
+d_list = [10]
 sample_num_list = [1000,5000]
 
 if os.path.exists("gauss_sample.dat"):
